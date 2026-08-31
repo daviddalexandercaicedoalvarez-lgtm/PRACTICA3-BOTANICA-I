@@ -1,0 +1,2451 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Plataforma Educativa (Fix)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .hidden-by-default {
+            display: none;
+        }
+        .card {
+            perspective: 1000px;
+        }
+        .card-inner {
+            position: relative;
+            width: 240px;
+            height: 140px;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .card:hover .card-inner {
+            transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 500;
+            padding: 0.75rem;
+            box-sizing: border-box;
+        }
+        .card-front {
+            background-color: #059669;
+            color: white;
+        }
+        .card-back {
+            background-color: #b91c1c;
+            color: white;
+            transform: rotateY(180deg);
+        }
+        .draggable {
+            cursor: grab;
+            background-color: #dbeafe;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            margin: 0.25rem;
+            display: inline-block;
+            user-select: none;
+        }
+        .dropzone {
+            border: 2px dashed #94a3b8;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            min-height: 50px;
+            transition: border-color 0.25s, background-color 0.25s;
+        }
+        .btn-file {
+            background: #2563eb;
+            color: white;
+            padding: .4rem .75rem;
+            border-radius: .4rem;
+            cursor: pointer;
+        }
+        pre.map {
+            white-space: pre-wrap;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+        }
+        .link-img {
+            color: #1d4ed8;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+    <div class="max-w-6xl mx-auto p-6">
+        <header class="mb-6">
+            <h1 class="text-3xl font-bold text-indigo-600">Plataforma Educativa Interactiva</h1>
+            <p class="text-sm text-gray-600 mt-2">
+                Recursos sobre <strong>cualquier contenido educativo, que desees agregar</strong>. Incluye quizzes secuenciales, glosario, flashcards, estructuras (imágenes via links), casos y actividades interactivas. Progreso guardado localmente.
+            </p>
+
+            <nav class="mt-4 flex flex-wrap gap-2">
+                <button class="btn" data-target="home">Inicio</button>
+                <button class="btn" data-target="quiz">Quiz</button>
+                <button class="btn" data-target="gloss">Glosario</button>
+                <button class="btn" data-target="flash">Flashcards</button>
+                <button class="btn" data-target="estructuras">Estructuras</button>
+                <button class="btn" data-target="casos">Casos</button>
+                <button class="btn" data-target="interactivo">Interactivo</button>
+                <button class="btn" data-target="map">Mapas</button>
+                <button class="btn" data-target="dash">Dashboard</button>
+                <label class="btn-file ml-2">
+                    Importar contenido (JSON)
+                    <input id="fileInput" type="file" accept="application/json" style="display:none">
+                </label>
+                <button id="exportJSON" class="btn">Exportar contenido</button>
+            </nav>
+        </header>
+
+        <!-- Home -->
+        <section id="home" class="bg-white p-5 rounded shadow">
+            <h2 id="homeTitle" class="text-xl font-semibold mb-2">Bienvenido</h2>
+
+            <p id="homeDescription" class="text-sm text-gray-700">
+                La plataforma está diseñada para estudiar y practicar los tres bloques fundamentales:
+                <strong>Endomembrana</strong> (síntesis, procesamiento y tráfico de proteínas/lípidos),
+                <strong>Estructuras y Procesos</strong> (ribosomas, lisosomas, RE, Golgi y mecanismos moleculares)
+                y <strong>Mitocondrias y Metabolismo – Plastidios y Cloroplastos</strong> (bioenergética, ATP, fotosíntesis).
+                Usa las herramientas interactivas para autoevaluación.
+            </p>
+
+            <details class="mt-4">
+                <summary class="cursor-pointer font-semibold">
+                    Editar contenido de Inicio (JSON)
+                </summary>
+
+                <textarea id="homeJSON"
+                    style="width:100%;height:160px"
+                    class="mt-2 border rounded p-2 font-mono text-sm">
+                    {
+                    "title": "Bienvenido",
+                    "description": "Texto de introducción editable desde JSON."
+                    }
+                </textarea>
+
+                <div class="mt-2 flex gap-2">
+                    <button id="loadHomeJSON" class="px-3 py-1 bg-green-600 text-white rounded">
+                        Cargar Inicio
+                    </button>
+                    <button id="exportHomeJSON" class="px-3 py-1 bg-gray-600 text-white rounded">
+                        Exportar Inicio
+                    </button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Quiz -->
+        <section id="quiz" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Quiz (secuencial por tema)</h2>
+            <div class="flex gap-3 mb-3">
+                <button id="prevQ" class="px-3 py-1 bg-gray-500 text-white rounded">Anterior</button>
+                <button id="nextQ" class="px-3 py-1 bg-indigo-600 text-white rounded">Siguiente</button>
+                <button id="showAll" class="px-3 py-1 bg-gray-600 text-white rounded">Mostrar preguntas (JSON)</button>
+                <select id="quizTopic" class="rounded border px-2"></select>
+            </div>
+
+            <div id="quizArea">
+                <p id="qText" class="font-medium mb-2">
+                    Cargando pregunta...
+                </p>
+                <div id="qOptions" class="space-y-2 mb-3"></div>
+                <button id="checkA" class="px-3 py-1 bg-amber-500 text-white rounded">Verificar</button>
+                <p id="qResult" class="mt-2 text-sm"></p>
+                <p class="text-xs text-gray-500 mt-2">
+                    Pregunta <span id="qNumber">0</span> de <span id="qTotal">0</span>
+                </p>
+            </div>
+
+            <details class="mt-4">
+                <summary class="cursor-pointer">Ver/Editar inventario de preguntas (JSON)</summary>
+                <textarea id="questionsJSON" style="width:100%;height:200px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadQuestions" class="px-3 py-1 bg-green-600 text-white rounded">Cargar preguntas desde JSON</button>
+                </div>
+            </details>
+            <details class="mt-4">
+                <summary class="cursor-pointer">Ver/Editar bloques del quiz (JSON)</summary>
+                <textarea id="quizTopicsJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadQuizTopics" class="px-3 py-1 bg-green-600 text-white rounded">Cargar bloques desde JSON</button>
+                    <button id="exportQuizTopics" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar bloques</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Glosario -->
+        <section id="gloss" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Glosario (términos técnicos)</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <input id="glossSearch" placeholder="Buscar término..." class="w-full p-2 border rounded mb-3" />
+                    <div id="glossList" style="max-height:420px;overflow:auto"></div>
+                </div>
+                <div>
+                    <h3 class="font-semibold">Agregar/editar término</h3>
+                    <input id="termInput" placeholder="Término" class="w-full p-2 border rounded mb-2" />
+                    <textarea id="defInput" placeholder="Definición" class="w-full p-2 border rounded mb-2" style="height:160px"></textarea>
+                    <div class="flex gap-2">
+                        <button id="addTerm" class="px-3 py-1 bg-green-600 text-white rounded">Agregar término</button>
+                        <button id="clearGloss" class="px-3 py-1 bg-red-500 text-white rounded">Borrar todo</button>
+                    </div>
+                </div>
+            </div>
+
+            <details class="mt-4">
+                <summary>Exportar/Importar glosario (JSON)</summary>
+                <textarea id="glossJSON" style="width:100%;height:140px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="importGloss" class="px-3 py-1 bg-blue-600 text-white rounded">Importar glosario</button>
+                    <button id="exportGloss" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar glosario</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Flashcards -->
+        <section id="flash" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Flashcards (giran al hacer hover o clic)</h2>
+            <div class="flex flex-wrap gap-4" id="flashContainer" style="min-height:160px"></div>
+
+            <details class="mt-4">
+                <summary>Administrar flashcards (JSON)</summary>
+                <textarea id="flashJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadFlash" class="px-3 py-1 bg-green-600 text-white rounded">Cargar flashcards</button>
+                    <button id="exportFlash" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar flashcards</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Estructuras -->
+        <section id="estructuras" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Estructuras: identificación (imágenes como links)</h2>
+            <p class="text-sm text-gray-700 mb-3">
+                Haz clic en el enlace para abrir la imagen en nueva pestaña y luego elige la opción correcta.
+            </p>
+
+            <div id="structuresArea" class="space-y-4"></div>
+
+            <details class="mt-4">
+                <summary>Administrar estructuras (JSON)</summary>
+                <textarea id="structuresJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadStructures" class="px-3 py-1 bg-green-600 text-white rounded">Cargar estructuras</button>
+                    <button id="exportStructures" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar estructuras</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Casos -->
+        <section id="casos" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Casos de análisis (escenarios clínico/experimentales)</h2>
+            <div id="casesArea"></div>
+
+            <details class="mt-4">
+                <summary>Administrar casos (JSON)</summary>
+                <textarea id="casesJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadCases" class="px-3 py-1 bg-green-600 text-white rounded">Cargar casos</button>
+                    <button id="exportCases" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar casos</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Interactivo -->
+        <section id="interactivo" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Interactivo: arrastra y suelta / completar</h2>
+            <p class="text-sm mb-3">
+                Ejercicios arrastrar-soltar y completar. Los ejercicios se cargan desde JSON (50 ítems) para mantener compatibilidad.
+            </p>
+
+            <div id="interactiveArea" class="space-y-4"></div>
+
+            <details class="mt-4">
+                <summary>Administrar interactivos (JSON)</summary>
+                <textarea id="interJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadInter" class="px-3 py-1 bg-green-600 text-white rounded">Cargar interactivos</button>
+                    <button id="exportInter" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar interactivos</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Mapas -->
+        <section id="map" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Mapas conceptuales</h2>
+            <div id="mapsDisplay" class="grid grid-cols-1 gap-4 mb-3"></div>
+
+            <details class="mt-4">
+                <summary>Administrar mapas (JSON)</summary>
+                <textarea id="mapsJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadMaps" class="px-3 py-1 bg-green-600 text-white rounded">Cargar mapas</button>
+                    <button id="exportMaps" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar mapas</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Dashboard -->
+        <section id="dash" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Dashboard de progreso</h2>
+
+            <p class="text-sm">
+                Puntaje total:
+                <span id="score">0</span> /
+                <span id="maxScore">0</span>
+            </p>
+
+            <p class="text-sm mt-1">
+                Progreso general:
+                <span id="scorePercent">0%</span>
+            </p>
+
+            <button id="reset" class="mt-2 px-3 py-1 bg-red-500 text-white rounded">
+                Reiniciar progreso
+            </button>
+
+            <div class="mt-4">
+                <h3 class="font-semibold">Progreso por sección</h3>
+                <ul class="list-disc ml-6 text-sm">
+                    <li>Quiz: <span id="progressQuiz" class="font-semibold text-blue-600">0 / 0 - 0%</span></li>
+                    <li>Glosario: <span id="progressGloss" class="font-semibold text-green-600">0 / 0 - 0%</span></li>
+                    <li>Flashcards: <span id="progressFlash" class="font-semibold text-purple-600">0 / 0 - 0%</span></li>
+                    <li>Estructuras: <span id="progressStructures" class="font-semibold text-indigo-600">0 / 0 - 0%</span></li>
+                    <li>Casos: <span id="progressCases" class="font-semibold text-red-600">0 / 0 - 0%</span></li>
+                    <li>Interactivo: <span id="progressInteractive" class="font-semibold text-amber-600">0 / 0 - 0%</span></li>
+                    <li>Mapas: <span id="progressMaps" class="font-semibold text-teal-600">0 / 0 - 0%</span></li>
+                </ul>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        function normalizeText(value) {
+            return String(value || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/\s+/g, ' ')
+            .trim();
+        }
+
+        /* --------------------------
+  ESTRUCTURA DE DATOS (DB) - muestra mínima inicial para pruebas.
+  Reemplaza con tu JSON grande importándolo.
+-------------------------- */
+        let DB = {
+            "quizTopics": [{
+                "value": "algas",
+                "label": "1) Algas filamentosas"
+            },
+                {
+                    "value": "liquenes",
+                    "label": "2) Líquenes y hongos liquenizados"
+                },
+                {
+                    "value": "briofitos",
+                    "label": "3) Briófitos: musgos, hepáticas y Anthoceros"
+                }],
+            "questions": [{
+                "id": "q1",
+                "topic": "algas",
+                "text": "En un montaje húmedo de un alga filamentosa, ¿qué combinación de estructuras debe identificarse para caracterizar sus células?",
+                "options": [
+                    "Pared celular, cloroplastos, pirenoides y núcleo",
+                    "Rizoides, seta, cápsula y peristoma",
+                    "Rizinas, apotecios, isidios y soredios",
+                    "Caulidio, filidios, involucro y arquegonióforo"
+                ],
+                "answer": 0,
+                "explain": "La observación microscópica del alga filamentosa permite reconocer pared celular, cloroplastos, pirenoides y núcleo. La disposición de las células en fila permite reconocer el hábito filamentoso."
+            },
+                {
+                    "id": "q2",
+                    "topic": "algas",
+                    "text": "¿Cuál es la relación funcional más adecuada entre los cloroplastos y los pirenoides observados en el alga filamentosa?",
+                    "options": [
+                        "Los cloroplastos participan en la fotosíntesis y los pirenoides se asocian con la concentración de carbono y acumulación de almidón",
+                        "Los cloroplastos fijan el organismo al sustrato y los pirenoides producen esporas",
+                        "Los cloroplastos forman el núcleo y los pirenoides controlan la salida de esporas",
+                        "Los cloroplastos constituyen la pared celular y los pirenoides originan los rizoides"
+                    ],
+                    "answer": 0,
+                    "explain": "Los cloroplastos contienen los sistemas fotosintéticos. Los pirenoides se encuentran asociados a la concentración de carbono y, en numerosas algas, a la acumulación o síntesis de almidón."
+                },
+                {
+                    "id": "q3",
+                    "topic": "liquenes",
+                    "text": "Un corte transversal de un líquen muestra una capa de células verdes próxima a la superficie y una masa de estructuras filamentosas. ¿Qué interpretación corresponde mejor a estas estructuras?",
+                    "options": [
+                        "Las células verdes corresponden al fotobionte y las estructuras filamentosas corresponden principalmente a hifas del micobionte",
+                        "Las células verdes son rizoides y las estructuras filamentosas son raíces verdaderas",
+                        "Las células verdes son esporas y las estructuras filamentosas son vasos conductores",
+                        "Las células verdes son células epidérmicas y las estructuras filamentosas son estomas"
+                    ],
+                    "answer": 0,
+                    "explain": "En el líquen, el fotobionte está constituido por células fotosintéticas, mientras que el micobionte corresponde principalmente al hongo, cuyas hifas forman gran parte de la estructura del talo."
+                },
+                {
+                    "id": "q4",
+                    "topic": "liquenes",
+                    "text": "¿Qué diferencia permite distinguir principalmente un apotecio de un soredio o un isidio?",
+                    "options": [
+                        "El apotecio es una estructura sexual del componente fúngico, mientras que soredios e isidios participan en la reproducción asexual",
+                        "El apotecio es una estructura exclusiva del fotobionte y los soredios producen gametos",
+                        "El apotecio corresponde a una rizina y los isidios forman la médula",
+                        "El apotecio es siempre subterráneo y los soredios forman la corteza superior"
+                    ],
+                    "answer": 0,
+                    "explain": "Los apotecios son estructuras reproductivas sexuales del componente fúngico. Isidios y soredios son estructuras de propagación asexual que permiten dispersar simultáneamente los componentes de la asociación liquénica."
+                },
+                {
+                    "id": "q5",
+                    "topic": "briofitos",
+                    "text": "En un musgo se observa una parte inferior con rizoides, caulidio y filidios, y una parte superior con seta y cápsula. ¿Cuál es la interpretación correcta?",
+                    "options": [
+                        "La parte inferior corresponde al gametofito haploide y la parte superior al esporofito diploide",
+                        "La parte inferior corresponde al esporofito diploide y la superior al gametofito haploide",
+                        "Ambas partes corresponden al mismo tejido diploide",
+                        "Ambas partes corresponden exclusivamente al gametofito haploide"
+                    ],
+                    "answer": 0,
+                    "explain": "El gametofito haploide constituye la generación dominante del musgo y presenta rizoides, caulidio y filidios. El esporofito diploide se desarrolla a partir del cigoto y presenta seta y cápsula."
+                },
+                {
+                    "id": "q6",
+                    "topic": "briofitos",
+                    "text": "¿Qué función cumple principalmente el peristoma de la cápsula de un musgo?",
+                    "options": [
+                        "Regular la liberación de esporas mediante movimientos relacionados con la humedad",
+                        "Producir los gametos masculinos del gametofito",
+                        "Fijar el gametofito al sustrato mediante células unicelulares",
+                        "Realizar directamente la fotosíntesis de los filidios"
+                    ],
+                    "answer": 0,
+                    "explain": "El peristoma está situado en la abertura de la cápsula y participa en la regulación de la liberación de esporas mediante movimientos higroscópicos."
+                },
+                {
+                    "id": "q7",
+                    "topic": "algas",
+                    "text": "Al preparar una muestra de un alga filamentosa para observación microscópica, ¿cuál procedimiento favorece la visualización de sus estructuras celulares?",
+                    "options": [
+                        "Colocar una gota de agua sobre el portaobjetos, disponer el material, cubrirlo con cubreobjetos y observar al microscopio",
+                        "Secar completamente el material antes de colocarlo directamente sobre el ocular",
+                        "Introducir el material en parafina y observarlo sin portaobjetos",
+                        "Colocar el material sobre el objetivo y añadir agua después de enfocar"
+                    ],
+                    "answer": 0,
+                    "explain": "El montaje húmedo permite conservar el material y facilita la observación microscópica. La preparación se realiza colocando una gota de agua, el material biológico y el cubreobjetos antes de observar."
+                },
+                {
+                    "id": "q8",
+                    "topic": "algas",
+                    "text": "En una observación microscópica, las células de un alga aparecen conectadas extremo con extremo formando una estructura alargada. ¿Qué característica se está reconociendo principalmente?",
+                    "options": [
+                        "Organización filamentosa",
+                        "Talo folioso",
+                        "Cápsula esporangial",
+                        "Talo fruticuloso"
+                    ],
+                    "answer": 0,
+                    "explain": "La disposición de células consecutivas formando una hilera continua es característica de una organización filamentosa."
+                },
+                {
+                    "id": "q9",
+                    "topic": "algas",
+                    "text": "¿Por qué la identificación del núcleo resulta relevante durante la observación de un alga filamentosa?",
+                    "options": [
+                        "Permite reconocer una estructura celular que contiene el material genético y diferenciarla de estructuras fotosintéticas como los cloroplastos",
+                        "Demuestra que el organismo posee tejidos vasculares verdaderos",
+                        "Indica que la célula corresponde a un esporofito diploide",
+                        "Permite identificar directamente un apotecio"
+                    ],
+                    "answer": 0,
+                    "explain": "El núcleo contiene el material genético y constituye una estructura distinta de los cloroplastos. Su identificación forma parte de la caracterización microscópica de las células del alga."
+                },
+                {
+                    "id": "q10",
+                    "topic": "algas",
+                    "text": "Si en una preparación se observan numerosos cloroplastos verdes pero no se reconoce una organización en tejidos diferenciados, ¿qué interpretación es más compatible con un alga filamentosa?",
+                    "options": [
+                        "Se trata de un organismo fotosintético cuyo cuerpo presenta organización relativamente simple y no un sistema vascular verdadero",
+                        "Se trata necesariamente de una planta vascular con xilema y floema",
+                        "Se trata de un líquen cuyo micobionte es el componente fotosintético",
+                        "Se trata de un musgo cuyo esporofito está formado exclusivamente por cloroplastos"
+                    ],
+                    "answer": 0,
+                    "explain": "Las algas presentan una organización corporal que no corresponde a la de las plantas vasculares. En un alga filamentosa, las células fotosintéticas se organizan en filamentos sin formar xilema y floema verdaderos."
+                },
+                {
+                    "id": "q11",
+                    "topic": "liquenes",
+                    "text": "¿Qué combinación identifica correctamente los dos componentes fundamentales de un líquen?",
+                    "options": [
+                        "Micobionte y fotobionte",
+                        "Gametofito y esporofito",
+                        "Xilema y floema",
+                        "Rizoide y arquegonio"
+                    ],
+                    "answer": 0,
+                    "explain": "El micobionte es el componente fúngico y el fotobionte es el componente fotosintético. La interacción entre ambos origina el talo liquénico."
+                },
+                {
+                    "id": "q12",
+                    "topic": "liquenes",
+                    "text": "En una muestra liquénica se observa un talo fuertemente adherido al sustrato, sin lóbulos fácilmente separables. ¿Qué biotipo corresponde mejor a esta descripción?",
+                    "options": [
+                        "Costroso",
+                        "Folioso",
+                        "Fruticuloso",
+                        "Gelatinoso"
+                    ],
+                    "answer": 0,
+                    "explain": "Los líquenes costrosos están fuertemente adheridos al sustrato y presentan un talo que puede ser difícil de separar de la superficie sobre la que crecen."
+                },
+                {
+                    "id": "q13",
+                    "topic": "liquenes",
+                    "text": "¿Qué característica permite reconocer un líquen folioso frente a uno costroso?",
+                    "options": [
+                        "Presenta un talo laminar o lobulado con mayor diferenciación de la superficie del sustrato",
+                        "Está constituido exclusivamente por células vegetales vasculares",
+                        "Presenta obligatoriamente una cápsula con peristoma",
+                        "Carece completamente de componente fúngico"
+                    ],
+                    "answer": 0,
+                    "explain": "Los líquenes foliosos presentan un talo aplanado, laminar o lobulado, generalmente más diferenciado del sustrato que el talo costroso."
+                },
+                {
+                    "id": "q14",
+                    "topic": "liquenes",
+                    "text": "Durante la identificación de un líquen se encuentran pequeñas estructuras que pueden desprenderse y contienen células del fotobionte asociadas con hifas. ¿Qué estructura es más probable?",
+                    "options": [
+                        "Soredio",
+                        "Peristoma",
+                        "Rizoide",
+                        "Seta"
+                    ],
+                    "answer": 0,
+                    "explain": "Los soredios son propágulos asexuales formados por células del fotobionte asociadas con hifas del micobionte, lo que permite dispersar la asociación."
+                },
+                {
+                    "id": "q15",
+                    "topic": "liquenes",
+                    "text": "¿Cuál es la función principal de las rizinas observadas en la cara inferior de algunos líquenes foliosos?",
+                    "options": [
+                        "Contribuir a la fijación del talo al sustrato",
+                        "Producir las esporas sexuales del hongo",
+                        "Realizar la fotosíntesis",
+                        "Formar el opérculo de la cápsula"
+                    ],
+                    "answer": 0,
+                    "explain": "Las rizinas son estructuras de fijación formadas principalmente por hifas y contribuyen a sujetar el talo liquénico al sustrato."
+                },
+                {
+                    "id": "q16",
+                    "topic": "liquenes",
+                    "text": "En un corte transversal de un talo liquénico heterómero se identifica una zona próxima a la superficie con numerosas células fotosintéticas y una región interna dominada por hifas. ¿Qué zonas se están diferenciando?",
+                    "options": [
+                        "Capa del fotobionte y médula",
+                        "Xilema y floema",
+                        "Seta y cápsula",
+                        "Rizoides y caulidio"
+                    ],
+                    "answer": 0,
+                    "explain": "En un talo heterómero puede diferenciarse una capa algal o fotobionte y una médula constituida principalmente por hifas laxamente organizadas."
+                },
+                {
+                    "id": "q17",
+                    "topic": "briofitos",
+                    "text": "¿Qué característica distingue fundamentalmente al gametofito de un musgo del esporofito?",
+                    "options": [
+                        "El gametofito es haploide y constituye la fase dominante, mientras que el esporofito es diploide y depende inicialmente del gametofito",
+                        "El gametofito es diploide y siempre produce esporas, mientras que el esporofito es haploide",
+                        "Ambos son haploides y producen exclusivamente gametos",
+                        "Ambos son diploides y producen exclusivamente esporas"
+                    ],
+                    "answer": 0,
+                    "explain": "En los musgos existe alternancia de generaciones. El gametofito haploide es dominante y el esporofito diploide se desarrolla a partir del cigoto y produce esporas."
+                },
+                {
+                    "id": "q18",
+                    "topic": "briofitos",
+                    "text": "En un musgo, ¿qué estructura sostiene la cápsula y permite elevarla sobre el gametofito?",
+                    "options": [
+                        "Seta",
+                        "Filidio",
+                        "Rizoide",
+                        "Caulidio"
+                    ],
+                    "answer": 0,
+                    "explain": "La seta es el eje del esporofito que sostiene y eleva la cápsula sobre el gametofito."
+                },
+                {
+                    "id": "q19",
+                    "topic": "briofitos",
+                    "text": "Una cápsula de musgo presenta un opérculo que puede desprenderse y deja expuesto el peristoma. ¿Qué secuencia funcional es correcta?",
+                    "options": [
+                        "El opérculo se desprende, el peristoma queda expuesto y sus dientes contribuyen a regular la dispersión de esporas",
+                        "El opérculo produce gametos y el peristoma forma rizoides",
+                        "El opérculo realiza fotosíntesis y el peristoma forma el caulidio",
+                        "El opérculo origina el gametofito y el peristoma origina el cigoto"
+                    ],
+                    "answer": 0,
+                    "explain": "En muchas cápsulas de musgos, el opérculo se desprende y deja expuestos los dientes del peristoma, cuya respuesta a la humedad contribuye a controlar la liberación de esporas."
+                },
+                {
+                    "id": "q20",
+                    "topic": "briofitos",
+                    "text": "¿Cuál de las siguientes combinaciones corresponde a estructuras del gametofito de un musgo?",
+                    "options": [
+                        "Rizoides, caulidio y filidios",
+                        "Seta, cápsula y peristoma",
+                        "Opérculo, cápsula y dientes del peristoma",
+                        "Caliptra, seta y cápsula"
+                    ],
+                    "answer": 0,
+                    "explain": "El gametofito del musgo presenta rizoides, caulidio y filidios. Seta, cápsula, opérculo y peristoma forman parte del esporofito."
+                },
+                {
+                    "id": "q21",
+                    "topic": "briofitos",
+                    "text": "En una hepática talosa se observa un cuerpo aplanado, verde y con ramificación dicotómica. ¿Qué conjunto de estructuras sería compatible con esta organización?",
+                    "options": [
+                        "Rizoides, escamas multicelulares y estructuras reproductivas especializadas",
+                        "Seta, cápsula y peristoma como parte de un gametofito dominante",
+                        "Xilema, floema y raíces verdaderas",
+                        "Filidios vascularizados con nervadura central lignificada"
+                    ],
+                    "answer": 0,
+                    "explain": "Las hepáticas talosas presentan un cuerpo aplanado y pueden mostrar ramificación dicotómica. En su superficie inferior pueden encontrarse rizoides y escamas multicelulares."
+                },
+                {
+                    "id": "q22",
+                    "topic": "briofitos",
+                    "text": "En una hepática talosa se observa una estructura reproductiva elevada que porta un disco con órganos productores de gametos masculinos. ¿Cómo se denomina?",
+                    "options": [
+                        "Anteridiofóro con disco anteridial",
+                        "Arquegoniofóro con disco arquegonial",
+                        "Cápsula con peristoma",
+                        "Esporangio con opérculo"
+                    ],
+                    "answer": 0,
+                    "explain": "El anteridiofóro es una estructura especializada que porta el disco anteridial, donde se encuentran los anteridios productores de gametos masculinos."
+                },
+                {
+                    "id": "q23",
+                    "topic": "briofitos",
+                    "text": "¿Qué estructura de una hepática talosa se relaciona directamente con los órganos reproductores femeninos?",
+                    "options": [
+                        "Arquegoniofóro con disco arquegonial",
+                        "Anteridiofóro con disco anteridial",
+                        "Peristoma",
+                        "Rizina"
+                    ],
+                    "answer": 0,
+                    "explain": "El arquegoniofóro porta el disco arquegonial, asociado con los arquegonios y la reproducción sexual femenina de la hepática talosa."
+                },
+                {
+                    "id": "q24",
+                    "topic": "briofitos",
+                    "text": "¿Qué rasgo es característico de Anthoceros y permite distinguirlo visualmente de muchos musgos?",
+                    "options": [
+                        "Presenta un esporofito alargado con forma de cuerno que se desarrolla sobre un gametofito aplanado",
+                        "Presenta una cápsula esférica sostenida por una seta muy larga y un peristoma siempre desarrollado",
+                        "Presenta un talo exclusivamente costroso y asociado con un hongo",
+                        "Presenta xilema y floema verdaderos en el gametofito"
+                    ],
+                    "answer": 0,
+                    "explain": "Anthoceros, perteneciente a las antocerotas, presenta un gametofito aplanado y un esporofito alargado característicamente semejante a un cuerno."
+                },
+                {
+                    "id": "q25",
+                    "topic": "briofitos",
+                    "text": "Durante la comparación de musgos, hepáticas y Anthoceros, ¿qué característica comparten como briófitos?",
+                    "options": [
+                        "Presentan una generación gametofítica dominante y carecen de tejidos vasculares verdaderos",
+                        "Presentan siempre raíces, tallos y hojas verdaderos con xilema y floema",
+                        "El esporofito constituye siempre la generación dominante e independiente",
+                        "Todos poseen semillas y flores para reproducirse"
+                    ],
+                    "answer": 0,
+                    "explain": "Los briófitos presentan una marcada dominancia del gametofito y carecen de sistemas vasculares verdaderos como los de las plantas vasculares. La reproducción sexual y el desarrollo del esporofito forman parte de su ciclo de vida."
+                },
+                {
+                    "id": "q26",
+                    "topic": "algas",
+                    "text": "Si durante la observación de un alga filamentosa se confunde un pirenoide con un núcleo, ¿qué criterio microscópico resulta más útil para diferenciarlos?",
+                    "options": [
+                        "El pirenoide se encuentra asociado al cloroplasto, mientras que el núcleo es una estructura celular distinta que contiene el material genético",
+                        "El núcleo siempre forma parte de la pared celular y el pirenoide está fuera de la célula",
+                        "El pirenoide constituye la seta y el núcleo forma la cápsula",
+                        "Ambas estructuras son equivalentes y cumplen exactamente la misma función"
+                    ],
+                    "answer": 0,
+                    "explain": "El pirenoide es una estructura asociada al cloroplasto, mientras que el núcleo constituye el compartimento que contiene el material genético. La posición y asociación con otras estructuras ayudan a diferenciarlos."
+                },
+                {
+                    "id": "q27",
+                    "topic": "liquenes",
+                    "text": "¿Qué inferencia es más adecuada cuando en un líquen se encuentran células verdes asociadas estrechamente con hifas fúngicas?",
+                    "options": [
+                        "La muestra evidencia la asociación entre fotobionte y micobionte que caracteriza al talo liquénico",
+                        "La muestra demuestra la presencia de xilema y floema",
+                        "Las células verdes corresponden exclusivamente al micobionte",
+                        "Las hifas corresponden a raíces verdaderas del fotobionte"
+                    ],
+                    "answer": 0,
+                    "explain": "La coexistencia organizada de células fotosintéticas y hifas fúngicas constituye una evidencia anatómica de los dos componentes principales del líquen."
+                },
+                {
+                    "id": "q28",
+                    "topic": "briofitos",
+                    "text": "¿Cuál evento marca la transición desde el gametofito hacia la formación del esporofito en el ciclo de vida de un musgo?",
+                    "options": [
+                        "La fecundación produce un cigoto diploide que se desarrolla como esporofito",
+                        "La germinación de una espora produce directamente una cápsula diploide",
+                        "La formación de filidios transforma al gametofito en tejido vascular",
+                        "La apertura del peristoma produce el cigoto"
+                    ],
+                    "answer": 0,
+                    "explain": "La fecundación une los gametos y produce un cigoto diploide. El cigoto se desarrolla sobre el gametofito y origina el esporofito."
+                },
+                {
+                    "id": "q29",
+                    "topic": "briofitos",
+                    "text": "Una muestra presenta un gametofito aplanado, verde, arrosetado y con ramificación dicotómica. En la parte reproductiva se observa una estructura alargada semejante a un cuerno. ¿Qué identificación es la más probable?",
+                    "options": [
+                        "Anthoceros",
+                        "Musgo con cápsula globosa",
+                        "Líquen costroso",
+                        "Alga filamentosa"
+                    ],
+                    "answer": 0,
+                    "explain": "La combinación de gametofito aplanado y esporofito alargado en forma de cuerno es característica de Anthoceros."
+                },
+                {
+                    "id": "q30",
+                    "topic": "briofitos",
+                    "text": "Un estudiante debe identificar rápidamente una estructura observada en una cápsula de musgo. Encuentra dientes situados alrededor de la abertura y relacionados con la humedad. ¿Cuál identificación y función son correctas?",
+                    "options": [
+                        "Peristoma; regula la liberación de esporas mediante movimientos higroscópicos",
+                        "Rizoides; absorben agua desde el sustrato",
+                        "Filidios; realizan la dispersión de esporas",
+                        "Rizinas; fijan la cápsula al sustrato"
+                    ],
+                    "answer": 0,
+                    "explain": "Los dientes del peristoma rodean la abertura de la cápsula y responden a cambios de humedad, contribuyendo a una liberación gradual y controlada de las esporas."
+                }],
+            "glossary": [{
+                "term": "Fotobionte",
+                "def": "Componente fotosintético de un líquen, constituido por un alga verde, una cianobacteria o, en algunos casos, una combinación de estos organismos."
+            },
+                {
+                    "term": "Peristoma",
+                    "def": "Estructura formada por dientes situada en la abertura de la cápsula de muchos musgos; regula la liberación de esporas mediante movimientos higroscópicos asociados con cambios de humedad."
+                },
+                {
+                    "term": "Gametofito",
+                    "def": "Generación haploide de los briófitos que constituye la fase dominante del ciclo de vida y sobre la cual se desarrollan las estructuras productoras de gametos."
+                },
+                {
+                    "term": "Micobionte",
+                    "def": "Componente fúngico de la asociación liquénica. Sus hifas constituyen gran parte de la estructura del talo, proporcionan soporte y participan en la captación y retención de agua y minerales."
+                },
+                {
+                    "term": "Talo",
+                    "def": "Cuerpo vegetativo de organización relativamente simple que no presenta la diferenciación en raíz, tallo y hojas verdaderos característica de las plantas vasculares. En líquenes, corresponde a la estructura formada por la asociación entre micobionte y fotobionte."
+                },
+                {
+                    "term": "Rizina",
+                    "def": "Estructura formada principalmente por hifas del componente fúngico de algunos líquenes, localizada generalmente en la superficie inferior del talo y relacionada principalmente con su fijación al sustrato."
+                },
+                {
+                    "term": "Apotecio",
+                    "def": "Estructura reproductiva sexual abierta de muchos hongos liquenizados, generalmente con forma de disco o copa, donde se desarrolla el himenio que contiene las estructuras productoras de esporas sexuales."
+                },
+                {
+                    "term": "Soredio",
+                    "def": "Propágulo asexual de los líquenes formado por células del fotobionte asociadas con hifas del micobionte. Al dispersarse, puede originar un nuevo talo liquénico si encuentra condiciones apropiadas."
+                },
+                {
+                    "term": "Isidio",
+                    "def": "Propágulo asexual de un líquen que consiste en una pequeña proliferación de la superficie del talo y contiene conjuntamente hifas del micobionte y células del fotobionte."
+                },
+                {
+                    "term": "Pirenoide",
+                    "def": "Estructura asociada al cloroplasto de numerosas algas y otros organismos fotosintéticos. Participa en mecanismos de concentración de carbono y suele estar relacionada con la formación o acumulación de reservas de almidón."
+                },
+                {
+                    "term": "Caulidio",
+                    "def": "Estructura semejante a un tallo presente en el gametofito de muchos briófitos, sobre la cual se disponen los filidios. No corresponde a un tallo vascular verdadero."
+                },
+                {
+                    "term": "Filidio",
+                    "def": "Estructura semejante a una hoja que forma parte del gametofito de musgos y de algunas hepáticas foliosas. Participa principalmente en la fotosíntesis y en el intercambio de agua y gases."
+                },
+                {
+                    "term": "Rizoide",
+                    "def": "Estructura filamentosa del gametofito de los briófitos que contribuye a la fijación al sustrato y puede participar en la absorción de agua y sustancias minerales. A diferencia de una raíz verdadera, carece de la organización vascular propia de las raíces de las plantas vasculares."
+                },
+                {
+                    "term": "Esporofito",
+                    "def": "Generación diploide que se origina a partir del cigoto después de la fecundación. En los musgos comprende principalmente la seta y la cápsula, donde se forman las esporas mediante meiosis."
+                },
+                {
+                    "term": "Seta",
+                    "def": "Estructura alargada del esporofito de los musgos que sostiene y eleva la cápsula por encima del gametofito, favoreciendo la exposición y posterior dispersión de las esporas."
+                },
+                {
+                    "term": "Cápsula",
+                    "def": "Parte terminal del esporofito de muchos musgos que funciona como esporangio. Contiene el tejido productor de esporas y puede presentar estructuras especializadas como opérculo y peristoma para controlar su liberación."
+                },
+                {
+                    "term": "Higroscópico",
+                    "def": "Característica de una estructura que responde a cambios en el contenido de humedad del ambiente. En el peristoma de los musgos, los movimientos higroscópicos de los dientes ayudan a regular la liberación de las esporas."
+                },
+                {
+                    "term": "Anteridiofóro",
+                    "def": "Estructura especializada de ciertas hepáticas talosas que sostiene el disco anteridial, donde se encuentran los anteridios productores de gametos masculinos."
+                },
+                {
+                    "term": "Arquegoniofóro",
+                    "def": "Estructura especializada de ciertas hepáticas talosas que sostiene el disco arquegonial, asociado con los arquegonios donde se desarrolla el gameto femenino y posteriormente el cigoto tras la fecundación."
+                },
+                {
+                    "term": "Anthoceros",
+                    "def": "Género representativo de las antocerotas, caracterizado por un gametofito verde, aplanado y generalmente arrosetado, sobre el cual se desarrolla un esporofito alargado con aspecto de cuerno."
+                }],
+            "flashcards": [{
+                "id": "f1",
+                "front": "Alga filamentosa: estructuras diagnósticas",
+                "back": "Pared celular, cloroplastos, pirenoides y núcleo; las células se disponen en filamentos."
+            },
+                {
+                    "id": "f2",
+                    "front": "Organización de un líquen",
+                    "back": "Asociación entre micobionte (hongo) y fotobionte (alga o cianobacteria)."
+                },
+                {
+                    "id": "f3",
+                    "front": "Ciclo de vida de los musgos",
+                    "back": "Gametofito haploide dominante; esporofito diploide con seta y cápsula."
+                },
+                {
+                    "id": "f4",
+                    "front": "¿Qué es el micobionte?",
+                    "back": "Componente fúngico del líquen; forma gran parte del talo mediante hifas."
+                },
+                {
+                    "id": "f5",
+                    "front": "¿Qué es el talo?",
+                    "back": "Cuerpo vegetativo sin raíz, tallo y hojas verdaderos."
+                },
+                {
+                    "id": "f6",
+                    "front": "Función del pirenoide",
+                    "back": "Se asocia a concentración de carbono y acumulación de almidón."
+                },
+                {
+                    "id": "f7",
+                    "front": "¿Qué son las rizinas?",
+                    "back": "Estructuras de hifas que fijan el líquen al sustrato."
+                },
+                {
+                    "id": "f8",
+                    "front": "¿Qué es un apotecio?",
+                    "back": "Estructura sexual abierta del componente fúngico del líquen."
+                },
+                {
+                    "id": "f9",
+                    "front": "¿Qué es un soredio?",
+                    "back": "Propágulo asexual con células del fotobionte y hifas."
+                },
+                {
+                    "id": "f10",
+                    "front": "¿Qué es un isidio?",
+                    "back": "Proyección del talo liquénico que permite reproducción asexual."
+                },
+                {
+                    "id": "f11",
+                    "front": "Talo costroso",
+                    "back": "Talo liquénico fuertemente adherido al sustrato."
+                },
+                {
+                    "id": "f12",
+                    "front": "Talo folioso",
+                    "back": "Talo laminar o lobulado, más separado del sustrato."
+                },
+                {
+                    "id": "f13",
+                    "front": "Talo fruticuloso",
+                    "back": "Talo ramificado, generalmente tridimensional y elevado del sustrato."
+                },
+                {
+                    "id": "f14",
+                    "front": "¿Qué es un caulidio?",
+                    "back": "Estructura semejante a tallo en el gametofito de los briófitos."
+                },
+                {
+                    "id": "f15",
+                    "front": "¿Qué es un filidio?",
+                    "back": "Estructura semejante a hoja del gametofito de musgos y hepáticas foliosas."
+                },
+                {
+                    "id": "f16",
+                    "front": "Función de los rizoides",
+                    "back": "Fijan el gametofito al sustrato y pueden favorecer la absorción de agua."
+                },
+                {
+                    "id": "f17",
+                    "front": "¿Qué es el esporofito?",
+                    "back": "Generación diploide que surge del cigoto y produce esporas."
+                },
+                {
+                    "id": "f18",
+                    "front": "Función de la seta",
+                    "back": "Sostiene y eleva la cápsula del esporofito."
+                },
+                {
+                    "id": "f19",
+                    "front": "¿Qué es la cápsula?",
+                    "back": "Esporangio del musgo donde se forman las esporas."
+                },
+                {
+                    "id": "f20",
+                    "front": "Función del peristoma",
+                    "back": "Regula la liberación de esporas según la humedad."
+                }],
+            "structures": [{
+                "id": "s1",
+                "title": "En la Figura 1 de los resultados de la práctica, ¿qué se reconoce en la preparación observada al microscopio a 40x?",
+                "img": "https://n9.cl/1k50k",
+                "options": [
+                    "Un alga filamentosa constituida por una fila de células observada mediante montaje temporal",
+                    "Un líquen folioso formado por lóbulos y rizinas",
+                    "Un musgo con gametofito y esporofito diferenciados",
+                    "Una hepática talosa con ramificación dicotómica"
+                ],
+                "answer": 0,
+                "explain": "La Figura 1 corresponde a Talophyta, específicamente a un alga filamentosa observada mediante un montaje microscópico a 40x. El criterio principal de reconocimiento es la disposición de las células en una fila continua. De acuerdo con la guía, en este montaje se debían identificar pared celular, cloroplastos, pirenoides y núcleo, uno por célula."
+            },
+                {
+                    "id": "s2",
+                    "title": "En la Figura 2 de los resultados, ¿qué se observa principalmente al comparar las diferentes muestras de líquenes?",
+                    "img": "https://n9.cl/zgjb8a",
+                    "options": [
+                        "Una diversidad de biotipos liquénicos que incluye costrosos, foliosos, fruticulosos, gelatinosos y dimórficos",
+                        "Únicamente diferentes especies de musgos con cápsulas maduras",
+                        "Diferentes tipos de hepáticas exclusivamente foliosas",
+                        "Algunas algas filamentosas diferenciadas por el número de cloroplastos"
+                    ],
+                    "answer": 0,
+                    "explain": "La Figura 2 reúne muestras liquénicas con diferentes formas de crecimiento. Entre los ejemplares registrados se encuentran costrosos como Caloplaca y Pertusaria, foliosos como Hypotrachyna, Sticta y Lobariella, fruticulosos como Ramalina y Usnea, gelatinosos como Leptogium y dimórficos como Cladonia y Stereocaulon. La identificación del biotipo se basa principalmente en la forma y organización externa del talo."
+                },
+                {
+                    "id": "s3",
+                    "title": "En la Figura 3, ¿qué característica de Hypotrachyna permite reconocerla como un líquen folioso durante la observación directa y con estereoscopio?",
+                    "img": "https://n9.cl/l1rqpx",
+                    "options": [
+                        "Presenta un talo laminar dividido en lóbulos que se diferencia visualmente del sustrato",
+                        "Presenta un talo completamente incorporado en el sustrato y sin lóbulos distinguibles",
+                        "Presenta un talo formado por ramas cilíndricas colgantes fijadas por un único punto",
+                        "Presenta un cuerpo aplanado con rizoides unicelulares y escamas multicelulares"
+                    ],
+                    "answer": 0,
+                    "explain": "Hypotrachyna se reconoce en la práctica como líquen folioso. El talo folioso tiene aspecto de lámina y puede presentar lóbulos relativamente diferenciados del sustrato. En la observación directa y estereoscópica también pueden estudiarse estructuras asociadas a su cara ventral, como las rizinas."
+                },
+                {
+                    "id": "s4",
+                    "title": "En la Figura 4 se observa Usnea mediante un corte transversal del talo a 40x. ¿Qué característica se pretende reconocer con este procedimiento?",
+                    "img": "https://n9.cl/irjdg",
+                    "options": [
+                        "La organización interna del talo, diferenciando una zona próxima a la superficie con células verdes y regiones constituidas por hifas",
+                        "La presencia de xilema y floema formando un sistema vascular verdadero",
+                        "La organización de una cápsula de musgo con opérculo y peristoma",
+                        "La disposición de rizoides unicelulares debajo de un talo de Marchantia"
+                    ],
+                    "answer": 0,
+                    "explain": "En Usnea, el corte transversal permite pasar de la observación externa del talo fruticuloso a su organización interna. La guía indica reconocer cerca de la superficie células verdes redondeadas correspondientes al componente algal y, en el resto del talo, estructuras filamentosas correspondientes a hifas del hongo. El procedimiento utiliza varios cortes, agua destilada, portaobjetos y cubreobjetos, comenzando con menor aumento y continuando con mayor aumento."
+                },
+                {
+                    "id": "s5",
+                    "title": "En la Figura 5, ¿qué rasgo observable de Hypotrachyna es especialmente útil para reconocer su organización como líquen folioso?",
+                    "img": "https://n9.cl/hj1fk",
+                    "options": [
+                        "La presencia de una estructura laminar y lobulada que forma un talo folioso",
+                        "La incorporación completa del talo dentro de la roca o sustrato",
+                        "La formación de lacinias ramificadas con crecimiento principalmente colgante",
+                        "La presencia de una cápsula elevada por una seta"
+                    ],
+                    "answer": 0,
+                    "explain": "La Figura 5 corresponde nuevamente a Hypotrachyna, pero la observación se realizó directamente y mediante estereoscopio. La característica diagnóstica para el biotipo es el talo folioso, de aspecto laminar y lobulado. El estereoscopio resulta particularmente útil para valorar la forma tridimensional del talo y su relación con el sustrato."
+                },
+                {
+                    "id": "s6",
+                    "title": "En la Figura 6, ¿qué se reconoce en la muestra de Parmotrema y qué característica permite identificar su biotipo?",
+                    "img": "https://n9.cl/ans5o1",
+                    "options": [
+                        "Un líquen folioso cuyo talo se presenta expandido en láminas o lóbulos",
+                        "Un líquen costroso completamente incluido en el sustrato",
+                        "Un líquen fruticuloso formado por ramas cilíndricas fijadas por un solo punto",
+                        "Una hepática foliosa con caulidio y filidios"
+                    ],
+                    "answer": 0,
+                    "explain": "Parmotrema, incluido en Parmeliaceae, fue registrado en la práctica entre los líquenes foliosos. Su reconocimiento se basa en el talo expandido en forma de láminas o lóbulos relativamente diferenciados del sustrato. La observación estereoscópica permite apreciar mejor la arquitectura externa del talo."
+                },
+                {
+                    "id": "s7",
+                    "title": "En la Figura 7 se comparan Polytrichum, Sphagnum, Macromitrium y un musgo fértil. ¿Qué permite reconocer específicamente al ejemplar fértil?",
+                    "img": "https://n9.cl/mrfyd",
+                    "options": [
+                        "La presencia de un esporofito desarrollado sobre el gametofito, particularmente seta y cápsula",
+                        "La presencia de rizinas en la superficie ventral del talo",
+                        "La formación de apotecios cupuliformes sobre el organismo",
+                        "La presencia de un talo completamente incrustado en el sustrato"
+                    ],
+                    "answer": 0,
+                    "explain": "La fertilidad del musgo se reconoce por la presencia visible del esporofito. En la guía, el esporofito comprende principalmente la seta y la cápsula o esporangio, mientras que la parte vegetativa inferior corresponde al gametofito con rizoides, caulidio y filidios. Por ello, observar estructuras reproductivas elevadas permite distinguir un musgo fértil."
+                },
+                {
+                    "id": "s8",
+                    "title": "En la Figura 8, ¿qué conjunto de estructuras permite reconocer a Polytrichum como musgo con esporofito?",
+                    "img": "https://n9.cl/gt64he",
+                    "options": [
+                        "Gametofito con rizoides, caulidio y filidios, junto con esporofito formado por seta y cápsula",
+                        "Talo folioso con rizinas, soredios e isidios",
+                        "Talo aplanado con arquegonióforo y anteridióforo propios de una hepática talosa",
+                        "Talo filamentoso compuesto por células dispuestas en una sola fila"
+                    ],
+                    "answer": 0,
+                    "explain": "Polytrichum es un musgo y en la observación de la Figura 8 se busca relacionar las estructuras vegetativas del gametofito con las reproductivas del esporofito. El gametofito presenta rizoides, caulidio y filidios; el esporofito presenta seta y cápsula. La observación estereoscópica permite reconocer el organismo completo y el microscopio permite estudiar estructuras pequeñas como las células del filidio."
+                },
+                {
+                    "id": "s9",
+                    "title": "En la Figura 9, ¿qué conjunto corresponde a las hepáticas registradas durante la observación directa?",
+                    "img": "https://n9.cl/2ju4ki",
+                    "options": [
+                        "Porella, Frullania y Plagiochila como formas foliosas, y Marchantia como representante taloso",
+                        "Polytrichum, Sphagnum y Macromitrium como hepáticas foliosas, y Usnea como hepática talosa",
+                        "Caloplaca, Pertusaria y Graphidaceae como hepáticas costrosas, y Cladonia como hepática talosa",
+                        "Anthoceros como hepática foliosa y Marchantia como musgo con esporofito"
+                    ],
+                    "answer": 0,
+                    "explain": "La Figura 9 corresponde a la comparación de hepáticas. Se registraron Porella, Frullania y Plagiochila entre las formas foliosas y Marchantia como forma talosa. La distinción fundamental se basa en la organización del gametofito: las hepáticas foliosas presentan caulidio y filidios, mientras que Marchantia presenta un talo continuo, aplanado y lobulado."
+                },
+                {
+                    "id": "s10",
+                    "title": "En la Figura 10, ¿qué característica de Marchantia permite reconocerla como una hepática talosa?",
+                    "img": "https://n9.cl/ifk17",
+                    "options": [
+                        "Un cuerpo vegetativo plano y verde, con lobulación y ramificación dicotómica",
+                        "Un caulidio con numerosos filidios y una cápsula elevada por una seta",
+                        "Un talo folioso formado por lóbulos laminares con rizinas ventrales",
+                        "Un esporofito alargado en forma de cuerno emergiendo del gametofito"
+                    ],
+                    "answer": 0,
+                    "explain": "Marchantia fue registrada como hepática talosa. La guía indica que su gametofito presenta un cuerpo plano denominado talo, generalmente con forma de abanico, lobulación y ramificación dicotómica. En la superficie inferior pueden encontrarse rizoides unicelulares y escamas multicelulares, mientras que en la superficie se pueden reconocer poros aeríferos."
+                },
+                {
+                    "id": "s11",
+                    "title": "En la Figura 11, ¿qué característica permite reconocer la muestra de Plagiochila como una hepática foliosa?",
+                    "img": "https://n9.cl/kkgko",
+                    "options": [
+                        "La presencia de caulidio, filidios y rizoides organizados en un cuerpo folioso",
+                        "La presencia de un talo plano sin diferenciación en caulidio y filidios",
+                        "La presencia de rizinas, apotecios y soredios formando un talo liquénico",
+                        "La presencia de una fila continua de células que constituye un alga filamentosa"
+                    ],
+                    "answer": 0,
+                    "explain": "Plagiochila fue registrada como hepática foliosa. A diferencia de Marchantia, el gametofito presenta una organización en la que pueden distinguirse caulidio, filidios y rizoides. La observación con estereoscopio permite reconocer la arquitectura general y la disposición de los filidios."
+                },
+                {
+                    "id": "s12",
+                    "title": "En la imagen de la guía correspondiente al alga filamentosa, ¿qué conjunto de estructuras debe identificarse después de realizar el montaje temporal?",
+                    "img": "https://n9.cl/h5ydeb",
+                    "options": [
+                        "Pared celular, cloroplastos, pirenoides y núcleo, con un núcleo por célula según la guía",
+                        "Rizoides, caulidio, filidios y cápsula",
+                        "Rizinas, apotecios, isidios y soredios",
+                        "Anteridiofóros, arquegonióforos, escamas y poros aeríferos"
+                    ],
+                    "answer": 0,
+                    "explain": "La guía establece que la muestra de alga filamentosa debe colocarse con una gota de agua sobre el portaobjetos, cubrirse y observarse al microscopio. Durante la observación se deben identificar pared celular, cloroplastos, pirenoides y núcleo, uno por célula. El procedimiento permite relacionar la organización filamentosa con la estructura interna de las células."
+                },
+                {
+                    "id": "s13",
+                    "title": "En la imagen comparativa de biotipos liquénicos de la guía, ¿qué combinación permite reconocer correctamente un talo costroso y uno fruticuloso?",
+                    "img": "https://n9.cl/3jfay",
+                    "options": [
+                        "El costroso está fuertemente incorporado al sustrato, mientras el fruticuloso desarrolla lacinias o ramas y suele fijarse por una zona reducida",
+                        "El costroso presenta filidios y caulidio, mientras el fruticuloso posee cápsula y peristoma",
+                        "El costroso presenta rizinas ventrales, mientras el fruticuloso presenta arquegonióforos",
+                        "El costroso siempre es gelatinoso cuando está húmedo, mientras el fruticuloso siempre forma escamas"
+                    ],
+                    "answer": 0,
+                    "explain": "La guía diferencia los biotipos por la arquitectura del talo y su relación con el sustrato. El talo crustáceo está totalmente incluido o fuertemente adherido al sustrato, mientras que el fruticuloso presenta un crecimiento tridimensional, generalmente formado por lacinias, y puede estar fijado por un único punto."
+                },
+                {
+                    "id": "s14",
+                    "title": "En la imagen de la guía sobre rizinas, ¿qué función debe asociarse con las estructuras observadas en la cara ventral de un líquen folioso?",
+                    "img": "https://n9.cl/5nbfvt",
+                    "options": [
+                        "Contribuir a la fijación del talo al sustrato mediante estructuras formadas principalmente por hifas",
+                        "Producir las esporas dentro de una cápsula protegida por un opérculo",
+                        "Concentrar carbono dentro de los cloroplastos del alga filamentosa",
+                        "Producir gametos masculinos dentro de un anteridiofóro"
+                    ],
+                    "answer": 0,
+                    "explain": "Las rizinas son estructuras asociadas principalmente a la cara ventral de muchos líquenes foliosos y contribuyen a su fijación al sustrato. Su reconocimiento durante la práctica requiere observar la superficie inferior del talo, por lo que la manipulación y orientación de la muestra son importantes."
+                },
+                {
+                    "id": "s15",
+                    "title": "En la imagen de la guía donde se muestran estructuras cupuliformes sobre el talo, ¿qué estructura debe reconocerse y cuál es su importancia?",
+                    "img": "https://n9.cl/qfz2uz",
+                    "options": [
+                        "Un apotecio, estructura reproductiva sexual del hongo liquenizado donde se desarrolla el tejido fértil",
+                        "Un soredio, estructura formada exclusivamente por tejido reproductivo sexual del hongo",
+                        "Un isidio, estructura que corresponde exclusivamente a una prolongación de las hifas sin fotobionte",
+                        "Una rizina, estructura reproductiva ubicada en la cara ventral del líquen"
+                    ],
+                    "answer": 0,
+                    "explain": "Los apotecios son estructuras reproductivas sexuales del componente fúngico del líquen y pueden observarse externamente como estructuras abiertas, discoides o cupuliformes. Su reconocimiento permite diferenciar la reproducción sexual del hongo de las estructuras de propagación asexual, como isidios y soredios."
+                },
+                {
+                    "id": "s16",
+                    "title": "En la imagen de la guía correspondiente al corte transversal de un líquen, ¿qué organización debe reconocerse cerca de la superficie?",
+                    "img": "https://n9.cl/iphuu",
+                    "options": [
+                        "Una capa de células verdes del fotobionte próxima a la superficie y regiones internas constituidas principalmente por hifas del micobionte",
+                        "Una epidermis seguida de xilema, floema y médula vascular",
+                        "Una capa de filidios seguida de caulidio y tejido conductor",
+                        "Una cápsula con opérculo rodeada por dientes de peristoma"
+                    ],
+                    "answer": 0,
+                    "explain": "El corte transversal permite observar la organización interna del talo liquénico. La guía indica reconocer cerca de la superficie células verdes redondeadas correspondientes al componente algal y, hacia el interior, una masa de estructuras filamentosas correspondientes a las hifas del hongo. En un talo heterómero pueden distinguirse corteza, capa del fotobionte y médula."
+                },
+                {
+                    "id": "s17",
+                    "title": "En la imagen de la guía sobre soredios e isidios, ¿qué característica reproductiva permite diferenciarlos de los apotecios?",
+                    "img": "https://n9.cl/69t07",
+                    "options": [
+                        "Soredios e isidios son estructuras de reproducción asexual que permiten la propagación del líquen, mientras los apotecios participan en la reproducción sexual del hongo",
+                        "Soredios e isidios producen exclusivamente gametos, mientras los apotecios realizan fotosíntesis",
+                        "Los soredios son estructuras vasculares y los isidios corresponden a cápsulas de musgos",
+                        "Los apotecios son estructuras de fijación y los soredios constituyen únicamente la médula"
+                    ],
+                    "answer": 0,
+                    "explain": "La guía identifica los isidios y soredios como estructuras de reproducción asexual del líquen. Estos propágulos favorecen la dispersión de la asociación liquenizada, mientras que el apotecio es una estructura reproductiva sexual del componente fúngico."
+                },
+                {
+                    "id": "s18",
+                    "title": "En el esquema de Polytrichum de la guía, ¿qué estructura queda expuesta cuando el opérculo de la cápsula se desprende y qué función cumple?",
+                    "img": "https://n9.cl/1wa1w",
+                    "options": [
+                        "El peristoma, cuyos dientes regulan la salida de las esporas",
+                        "El caulidio, que produce las células fotosintéticas",
+                        "La caliptra, que constituye el tejido productor de esporas",
+                        "El filidio, que funciona como la cubierta de la cápsula"
+                    ],
+                    "answer": 0,
+                    "explain": "En el musgo, el opérculo funciona como una tapa situada en el ápice de la cápsula. Al desprenderse permite observar el peristoma en la boca de la cápsula. Los dientes del peristoma participan en la regulación de la liberación de las esporas, por lo que esta estructura es fundamental para comprender la dispersión del esporofito."
+                },
+                {
+                    "id": "s19",
+                    "title": "En la imagen de referencia de una hepática foliosa, ¿qué conjunto de estructuras debe reconocerse para diferenciarla de una hepática talosa como Marchantia?",
+                    "img": "https://n9.cl/n26ih",
+                    "options": [
+                        "Rizoides, caulidio y filidios organizados en un gametofito folioso",
+                        "Un talo plano y continuo con poros aeríferos, escamas y ramificación dicotómica",
+                        "Rizinas, soredios y apotecios asociados a un micobionte",
+                        "Seta, cápsula, opérculo y peristoma propios del esporofito de un musgo"
+                    ],
+                    "answer": 0,
+                    "explain": "La guía señala que la hepática foliosa presenta rizoides, caulidio y filidios. Esta organización permite diferenciarla de una hepática talosa como Marchantia, cuyo gametofito se presenta como un talo plano, lobulado y ramificado. La comparación se realiza principalmente mediante la morfología externa y la disposición de las estructuras."
+                },
+                {
+                    "id": "s20",
+                    "title": "Según la guía, si se hubiera observado Anthoceros al estereoscopio, ¿qué conjunto de características habría permitido reconocerlo?",
+                    "img": "https://n9.cl/t7kbtx",
+                    "options": [
+                        "Gametofito aplanado, verde y arrosetado con ramificación dicotómica, acompañado por un esporofito alargado en forma de cuerno",
+                        "Gametofito folioso con filidios, seta larga y cápsula cubierta por opérculo",
+                        "Talo folioso con rizinas ventrales, apotecios y soredios",
+                        "Talo filamentoso compuesto por una fila de células con cloroplastos y pirenoides"
+                    ],
+                    "answer": 0,
+                    "explain": "Anthoceros no fue observado experimentalmente en los resultados de la práctica, por lo que estas características corresponden a la observación esperada indicada por la guía. El gametofito se describe como aplanado, verde, arrosetado y de ramificación dicotómica, mientras que el esporofito emerge con forma alargada semejante a un cuerno. En su base se encuentra el involucro."
+                }],
+            "cases": [{
+                "id": "c1",
+                "text": "Durante la observación microscópica de un alga filamentosa se reconocen células dispuestas en una fila continua, cada una delimitada por una pared celular y con estructuras verdes internas. También se identifican pirenoides y un núcleo por célula. ¿Cuál conclusión integra mejor las observaciones?",
+                "options": [
+                    "Se trata de una organización multicelular filamentosa en la que los cloroplastos permiten la fotosíntesis y los pirenoides se relacionan con la concentración de carbono",
+                    "Se trata de un musgo porque las células están organizadas en fila",
+                    "Se trata de un líquen porque toda estructura verde corresponde al micobionte",
+                    "Se trata de un tejido vascular porque presenta pared celular"
+                ],
+                "answer": 0,
+                "feedback": "La disposición lineal corresponde al hábito filamentoso del alga. La pared celular aporta estabilidad, los cloroplastos contienen los sistemas fotosintéticos y los pirenoides se relacionan con mecanismos de concentración de carbono y acumulación de almidón en muchas algas."
+            },
+                {
+                    "id": "c2",
+                    "text": "En una muestra de líquen se observa un talo laminar con estructuras de fijación en su cara ventral. En otro sector se identifica una estructura cupuliforme y, en el corte transversal, células verdes rodeadas por hifas. ¿Qué interpretación es la más adecuada?",
+                    "options": [
+                        "El talo presenta características de un líquen folioso; las estructuras ventrales corresponden a rizinas, la estructura cupuliforme es un apotecio y el corte evidencia la asociación fotobionte-micobionte",
+                        "Se trata de un musgo cuyo peristoma está formado por células verdes",
+                        "Las estructuras ventrales son raíces y la estructura cupuliforme es una cápsula de esporas",
+                        "Las células verdes corresponden a tejido vascular y las hifas son filamentos de xilema"
+                    ],
+                    "answer": 0,
+                    "feedback": "La morfología laminar es característica del talo folioso. Las rizinas contribuyen a la fijación al sustrato, los apotecios son estructuras reproductivas sexuales del componente fúngico y el corte transversal permite reconocer la integración entre fotobionte y micobionte."
+                },
+                {
+                    "id": "c3",
+                    "text": "En un musgo se retira cuidadosamente el opérculo de una cápsula y quedan expuestos los dientes del peristoma. Si aumenta la humedad ambiental, ¿qué proceso se relaciona directamente con esta estructura?",
+                    "options": [
+                        "La regulación higroscópica de la liberación de esporas",
+                        "La formación del cigoto mediante fecundación",
+                        "La producción de cloroplastos en los filidios",
+                        "La formación de rizoides unicelulares"
+                    ],
+                    "answer": 0,
+                    "feedback": "El peristoma controla la salida de las esporas. Sus dientes responden a cambios de humedad mediante movimientos higroscópicos que favorecen la apertura o cierre de la boca de la cápsula y regulan la dispersión."
+                },
+                {
+                    "id": "c4",
+                    "text": "Durante una práctica se recibe una muestra liquénica con crecimiento fuertemente adherido al sustrato. Al intentar levantarla, se observa que prácticamente no puede separarse sin fragmentarse. ¿Qué identificación morfológica es la más probable y qué criterio operativo la sustenta?",
+                    "options": [
+                        "Costroso; el talo está íntimamente adherido al sustrato y carece de una organización laminar libre",
+                        "Folioso; presenta lóbulos aplanados claramente separados del sustrato",
+                        "Fruticuloso; presenta ramificaciones tridimensionales erectas o pendulosas",
+                        "Dimórfico; presenta simultáneamente estructuras primarias y podecios"
+                    ],
+                    "answer": 0,
+                    "feedback": "El biotipo costroso se reconoce operativamente por su fuerte adherencia al sustrato. La dificultad para separar el talo constituye un criterio macroscópico útil durante la identificación."
+                },
+                {
+                    "id": "c5",
+                    "text": "En una muestra de líquen se observan pequeñas estructuras superficiales que contienen conjuntamente células del fotobionte y hifas del micobionte. ¿Qué estructuras deben considerarse y qué ventaja reproductiva presentan?",
+                    "options": [
+                        "Soredios o isidios; permiten dispersar simultáneamente los componentes necesarios para establecer un nuevo talo",
+                        "Apotecios; producen directamente nuevos gametofitos de musgo",
+                        "Rizinas; producen esporas sexuales dentro de la médula",
+                        "Peristomas; transportan células fotosintéticas hacia el sustrato"
+                    ],
+                    "answer": 0,
+                    "feedback": "Los soredios y los isidios son estructuras de propagación asexual del líquen. Su importancia radica en que pueden dispersar el fotobionte asociado con hifas del micobionte, facilitando la formación de un nuevo talo."
+                },
+                {
+                    "id": "c6",
+                    "text": "En el laboratorio se observa un líquen con talo ramificado, tridimensional y separado del sustrato. Al realizar un corte transversal se pretende estudiar su organización interna. ¿Cuál procedimiento y resultado serían más adecuados?",
+                    "options": [
+                        "Realizar un corte transversal fino y observar regiones concéntricas del talo, relacionando las zonas fúngicas con la región del fotobionte",
+                        "Observar únicamente la superficie ventral para identificar dientes de peristoma",
+                        "Realizar un montaje de agua para identificar rizoides y cápsula del esporofito",
+                        "Buscar xilema y floema para confirmar que se trata de un tallo vascular"
+                    ],
+                    "answer": 0,
+                    "feedback": "En un líquen fruticuloso como Usnea, el corte transversal permite analizar la organización anatómica del talo. El procedimiento debe orientarse a reconocer las regiones constituidas por hifas y la zona asociada al fotobionte."
+                },
+                {
+                    "id": "c7",
+                    "text": "Durante la observación de un musgo fértil se distinguen estructuras verdes foliosas y, elevándose sobre ellas, una estructura alargada que termina en una cápsula. ¿Cómo debe interpretarse correctamente la relación entre ambas generaciones?",
+                    "options": [
+                        "Las estructuras verdes corresponden al gametofito dominante y la seta con cápsula pertenece al esporofito diploide",
+                        "Las estructuras verdes son el esporofito y la cápsula corresponde al gametofito",
+                        "La seta y la cápsula son estructuras del fotobionte",
+                        "Los filidios y la cápsula pertenecen al mismo tejido vascular"
+                    ],
+                    "answer": 0,
+                    "feedback": "En los musgos, el gametofito haploide constituye la fase dominante. El esporofito diploide permanece unido al gametofito y comprende principalmente la seta y la cápsula."
+                },
+                {
+                    "id": "c8",
+                    "text": "Un estudiante identifica en una hepática una estructura aplanada, laminar y sin caulidio ni filidios diferenciados. ¿Qué grupo debe considerar primero y qué característica debe comprobar para confirmar la identificación?",
+                    "options": [
+                        "Hepática talosa; debe comprobar la organización del gametofito en un talo aplanado y la presencia de estructuras reproductivas especializadas",
+                        "Musgo; debe buscar una cápsula con peristoma",
+                        "Hepática foliosa; debe buscar filidios claramente diferenciados sobre un caulidio",
+                        "Líquen; debe comprobar la presencia simultánea de micobionte y fotobionte"
+                    ],
+                    "answer": 0,
+                    "feedback": "Las hepáticas talosas presentan un gametofito aplanado que no se organiza en caulidio y filidios como las hepáticas foliosas. Marchantia constituye un ejemplo importante para esta comparación."
+                },
+                {
+                    "id": "c9",
+                    "text": "En una muestra de Plagiochila se desea diferenciar una hepática foliosa de una talosa mediante estereoscopio. ¿Qué secuencia de observación es más útil?",
+                    "options": [
+                        "Reconocer primero el eje semejante a caulidio, localizar los filidios y examinar su margen, que puede presentar dientes",
+                        "Buscar únicamente una cápsula y sus dientes de peristoma",
+                        "Buscar rizinas y determinar la presencia de un fotobionte",
+                        "Determinar si el organismo forma un talo costroso completamente adherido"
+                    ],
+                    "answer": 0,
+                    "feedback": "En una hepática foliosa, la observación estereoscópica permite reconocer el caulidio y los filidios. En Plagiochila, el margen dentado de los filidios constituye un carácter útil para la identificación."
+                },
+                {
+                    "id": "c10",
+                    "text": "Se observa una planta pequeña con gametofito aplanado en forma de roseta y numerosos esporofitos verticales, alargados y semejantes a cuernos. ¿Cuál identificación es la más compatible?",
+                    "options": [
+                        "Anthoceros",
+                        "Polytrichum",
+                        "Marchantia",
+                        "Usnea"
+                    ],
+                    "answer": 0,
+                    "feedback": "Anthoceros se caracteriza por un gametofito aplanado, generalmente arrosetado, y un esporofito alargado con aspecto de cuerno que emerge del gametofito."
+                }],
+            "interactives": [{
+                "id": "i1",
+                "type": "dragdrop",
+                "title": "Relaciona cada estructura con el organismo o función correspondiente",
+                "terms": [
+                    "Pirenoide",
+                    "Rizinas",
+                    "Peristoma",
+                    "Rizoides"
+                ],
+                "targets": [
+                    "Asociado a concentración de carbono y acumulación de almidón en muchas algas",
+                    "Fijación del talo liquénico al sustrato",
+                    "Regulación de la liberación de esporas del musgo",
+                    "Fijación y absorción asociada al cuerpo de los briófitos"
+                ],
+                "answerMap": {
+                    "Pirenoide": "Asociado a concentración de carbono y acumulación de almidón en muchas algas",
+                    "Rizinas": "Fijación del talo liquénico al sustrato",
+                    "Peristoma": "Regulación de la liberación de esporas del musgo",
+                    "Rizoides": "Fijación y absorción asociada al cuerpo de los briófitos"
+                }
+            },
+                {
+                    "id": "i2",
+                    "type": "complete",
+                    "title": "Completa la relación entre las generaciones de los musgos",
+                    "prompt": "En los musgos, la generación dominante es el _____ haploide, mientras que el _____ diploide produce esporas:",
+                    "answer": "gametofito; esporofito"
+                },
+                {
+                    "id": "i3",
+                    "type": "dragdrop",
+                    "title": "Relaciona el biotipo liquénico con su característica morfológica",
+                    "terms": [
+                        "Costroso",
+                        "Folioso",
+                        "Fruticuloso",
+                        "Dimórfico"
+                    ],
+                    "targets": [
+                        "Talo fuertemente adherido al sustrato",
+                        "Talo laminar o lobulado, parcialmente separado del sustrato",
+                        "Talo ramificado y tridimensional, erecto o penduloso",
+                        "Presenta dos tipos morfológicos de crecimiento en el mismo ciclo"
+                    ],
+                    "answerMap": {
+                        "Costroso": "Talo fuertemente adherido al sustrato",
+                        "Folioso": "Talo laminar o lobulado, parcialmente separado del sustrato",
+                        "Fruticuloso": "Talo ramificado y tridimensional, erecto o penduloso",
+                        "Dimórfico": "Presenta dos tipos morfológicos de crecimiento en el mismo ciclo"
+                    }
+                },
+                {
+                    "id": "i4",
+                    "type": "complete",
+                    "title": "Completa la anatomía básica del líquen",
+                    "prompt": "En un líquen heterómero, la región con células del _____ se encuentra asociada a hifas del _____, que constituye gran parte de la estructura del talo:",
+                    "answer": "fotobionte; micobionte"
+                },
+                {
+                    "id": "i5",
+                    "type": "dragdrop",
+                    "title": "Relaciona cada estructura del musgo con su función",
+                    "terms": [
+                        "Caulidio",
+                        "Filidio",
+                        "Seta",
+                        "Cápsula"
+                    ],
+                    "targets": [
+                        "Estructura semejante a tallo que porta los filidios",
+                        "Estructura semejante a hoja que participa principalmente en la fotosíntesis",
+                        "Eleva y sostiene la cápsula",
+                        "Esporangio donde se forman las esporas"
+                    ],
+                    "answerMap": {
+                        "Caulidio": "Estructura semejante a tallo que porta los filidios",
+                        "Filidio": "Estructura semejante a hoja que participa principalmente en la fotosíntesis",
+                        "Seta": "Eleva y sostiene la cápsula",
+                        "Cápsula": "Esporangio donde se forman las esporas"
+                    }
+                },
+                {
+                    "id": "i6",
+                    "type": "complete",
+                    "title": "Completa la identificación microscópica del alga",
+                    "prompt": "En un alga filamentosa, las células se organizan en una _____ continua y pueden observarse _____ asociados con los cloroplastos:",
+                    "answer": "fila; pirenoides"
+                },
+                {
+                    "id": "i7",
+                    "type": "dragdrop",
+                    "title": "Relaciona la estructura reproductiva del líquen con su función",
+                    "terms": [
+                        "Apotecio",
+                        "Soredio",
+                        "Isidio",
+                        "Rizina"
+                    ],
+                    "targets": [
+                        "Estructura sexual abierta donde se desarrolla el himenio",
+                        "Propágulo asexual con fotobionte y hifas",
+                        "Propágulo asexual formado como proliferación del talo",
+                        "Estructura principalmente relacionada con la fijación al sustrato"
+                    ],
+                    "answerMap": {
+                        "Apotecio": "Estructura sexual abierta donde se desarrolla el himenio",
+                        "Soredio": "Propágulo asexual con fotobionte y hifas",
+                        "Isidio": "Propágulo asexual formado como proliferación del talo",
+                        "Rizina": "Estructura principalmente relacionada con la fijación al sustrato"
+                    }
+                },
+                {
+                    "id": "i8",
+                    "type": "complete",
+                    "title": "Completa el procedimiento de observación de un musgo fértil",
+                    "prompt": "Para reconocer un musgo fértil mediante estereoscopio, primero se observa el _____ y luego se confirma la presencia del _____ formado por seta y cápsula:",
+                    "answer": "gametofito; esporofito"
+                },
+                {
+                    "id": "i9",
+                    "type": "dragdrop",
+                    "title": "Relaciona cada grupo con su criterio de reconocimiento",
+                    "terms": [
+                        "Alga filamentosa",
+                        "Líquen folioso",
+                        "Hepática foliosa",
+                        "Anthoceros"
+                    ],
+                    "targets": [
+                        "Células consecutivas formando un filamento",
+                        "Talo laminar o lobulado con diferenciación de superficies",
+                        "Caulidio con filidios diferenciados",
+                        "Gametofito aplanado con esporofitos semejantes a cuernos"
+                    ],
+                    "answerMap": {
+                        "Alga filamentosa": "Células consecutivas formando un filamento",
+                        "Líquen folioso": "Talo laminar o lobulado con diferenciación de superficies",
+                        "Hepática foliosa": "Caulidio con filidios diferenciados",
+                        "Anthoceros": "Gametofito aplanado con esporofitos semejantes a cuernos"
+                    }
+                },
+                {
+                    "id": "i10",
+                    "type": "complete",
+                    "title": "Completa la función del peristoma",
+                    "prompt": "Los dientes del _____ responden a cambios de humedad mediante movimientos _____ que regulan la liberación de esporas:",
+                    "answer": "peristoma; higroscópicos"
+                },
+                {
+                    "id": "i11",
+                    "type": "dragdrop",
+                    "title": "Relaciona la hepática con su organización",
+                    "terms": [
+                        "Marchantia",
+                        "Plagiochila",
+                        "Frullania",
+                        "Hepática talosa"
+                    ],
+                    "targets": [
+                        "Género representativo de hepáticas talosas",
+                        "Hepática foliosa con filidios que pueden presentar margen dentado",
+                        "Hepática foliosa con filidios especializados en forma de yelmo o saco",
+                        "Gametofito aplanado sin diferenciación típica en caulidio y filidios"
+                    ],
+                    "answerMap": {
+                        "Marchantia": "Género representativo de hepáticas talosas",
+                        "Plagiochila": "Hepática foliosa con filidios que pueden presentar margen dentado",
+                        "Frullania": "Hepática foliosa con filidios especializados en forma de yelmo o saco",
+                        "Hepática talosa": "Gametofito aplanado sin diferenciación típica en caulidio y filidios"
+                    }
+                },
+                {
+                    "id": "i12",
+                    "type": "complete",
+                    "title": "Completa la relación entre reproducción y estructuras liquénicas",
+                    "prompt": "Los _____ y los _____ son propágulos de reproducción asexual que contienen componentes del líquen; el _____ es una estructura sexual del componente fúngico:",
+                    "answer": "soredios; isidios; apotecio"
+                },
+                {
+                    "id": "i13",
+                    "type": "dragdrop",
+                    "title": "Ordena mentalmente el procedimiento de identificación microscópica",
+                    "terms": [
+                        "Alga filamentosa",
+                        "Corte liquénico",
+                        "Musgo fértil",
+                        "Hepática foliosa"
+                    ],
+                    "targets": [
+                        "Reconocer disposición celular y localizar cloroplastos, pirenoides y núcleo",
+                        "Distinguir estratos del talo y localizar la región del fotobionte",
+                        "Diferenciar gametofito de seta y cápsula del esporofito",
+                        "Reconocer caulidio, filidios y caracteres del margen foliar"
+                    ],
+                    "answerMap": {
+                        "Alga filamentosa": "Reconocer disposición celular y localizar cloroplastos, pirenoides y núcleo",
+                        "Corte liquénico": "Distinguir estratos del talo y localizar la región del fotobionte",
+                        "Musgo fértil": "Diferenciar gametofito de seta y cápsula del esporofito",
+                        "Hepática foliosa": "Reconocer caulidio, filidios y caracteres del margen foliar"
+                    }
+                },
+                {
+                    "id": "i14",
+                    "type": "complete",
+                    "title": "Completa el reconocimiento de un líquen fruticuloso",
+                    "prompt": "Un líquen con crecimiento _____, ramificado y tridimensional se clasifica como _____:",
+                    "answer": "erecto o penduloso; fruticuloso"
+                },
+                {
+                    "id": "i15",
+                    "type": "dragdrop",
+                    "title": "Relaciona el carácter observado con la interpretación correcta",
+                    "terms": [
+                        "Rizinas en cara ventral",
+                        "Lóbulos aplanados",
+                        "Talo fuertemente adherido",
+                        "Crecimiento ramificado"
+                    ],
+                    "targets": [
+                        "Fijación del líquen al sustrato",
+                        "Característica del biotipo folioso",
+                        "Característica del biotipo costroso",
+                        "Característica del biotipo fruticuloso"
+                    ],
+                    "answerMap": {
+                        "Rizinas en cara ventral": "Fijación del líquen al sustrato",
+                        "Lóbulos aplanados": "Característica del biotipo folioso",
+                        "Talo fuertemente adherido": "Característica del biotipo costroso",
+                        "Crecimiento ramificado": "Característica del biotipo fruticuloso"
+                    }
+                },
+                {
+                    "id": "i16",
+                    "type": "complete",
+                    "title": "Completa la organización del esporofito",
+                    "prompt": "En un musgo, la _____ sostiene la _____, estructura donde se desarrolla el tejido esporógeno:",
+                    "answer": "seta; cápsula"
+                },
+                {
+                    "id": "i17",
+                    "type": "dragdrop",
+                    "title": "Relaciona organismo y generación dominante",
+                    "terms": [
+                        "Musgos",
+                        "Hepáticas",
+                        "Anthoceros",
+                        "Líquenes"
+                    ],
+                    "targets": [
+                        "Gametofito haploide dominante",
+                        "Gametofito dominante con formas talosas o foliosas",
+                        "Gametofito aplanado con esporofito alargado característico",
+                        "Talo formado por asociación entre micobionte y fotobionte"
+                    ],
+                    "answerMap": {
+                        "Musgos": "Gametofito haploide dominante",
+                        "Hepáticas": "Gametofito dominante con formas talosas o foliosas",
+                        "Anthoceros": "Gametofito aplanado con esporofito alargado característico",
+                        "Líquenes": "Talo formado por asociación entre micobionte y fotobionte"
+                    }
+                },
+                {
+                    "id": "i18",
+                    "type": "complete",
+                    "title": "Completa la interpretación de un corte de líquen",
+                    "prompt": "En un corte transversal de un talo liquénico heterómero, la capa con células fotosintéticas corresponde al _____, mientras que las hifas pertenecen principalmente al _____:",
+                    "answer": "fotobionte; micobionte"
+                },
+                {
+                    "id": "i19",
+                    "type": "dragdrop",
+                    "title": "Relaciona estructura con técnica de observación",
+                    "terms": [
+                        "Pirenoides",
+                        "Biotipo liquénico",
+                        "Seta y cápsula",
+                        "Filidios dentados"
+                    ],
+                    "targets": [
+                        "Microscopio en preparación de alga filamentosa",
+                        "Observación directa o estereoscópica del talo",
+                        "Estereoscopio para reconocer el esporofito del musgo",
+                        "Estereoscopio para caracterizar una hepática foliosa"
+                    ],
+                    "answerMap": {
+                        "Pirenoides": "Microscopio en preparación de alga filamentosa",
+                        "Biotipo liquénico": "Observación directa o estereoscópica del talo",
+                        "Seta y cápsula": "Estereoscopio para reconocer el esporofito del musgo",
+                        "Filidios dentados": "Estereoscopio para caracterizar una hepática foliosa"
+                    }
+                },
+                {
+                    "id": "i20",
+                    "type": "complete",
+                    "title": "Completa el criterio para diferenciar líquenes y briófitos",
+                    "prompt": "La presencia de un _____ asociado a un _____ caracteriza la organización liquénica, mientras que el musgo presenta un gametofito con caulidio y filidios:",
+                    "answer": "micobionte; fotobionte"
+                }],
+            "maps": {
+                "algas": "Algas filamentosas\n├─ Organización\n│  ├─ Células dispuestas en fila\n│  ├─ Hábito filamentoso\n│  └─ Cada célula mantiene su individualidad\n├─ Estructuras observables\n│  ├─ Pared celular\n│  ├─ Cloroplastos\n│  │  └─ Fotosíntesis\n│  ├─ Pirenoides\n│  │  ├─ Concentración de carbono\n│  │  └─ Asociación con síntesis/acumulación de almidón\n│  └─ Núcleo\n└─ Técnica\n   ├─ Una gota de agua\n   ├─ Portaobjetos\n   ├─ Cubreobjetos\n   └─ Microscopio",
+                "liquenes": "Líquenes u hongos liquenizados\n├─ Asociación simbiótica\n│  ├─ Micobionte → hongo, principalmente Ascomicetes\n│  └─ Fotobionte → alga verde o cianobacteria\n├─ Biotipos del talo\n│  ├─ Costroso → fuertemente adherido al sustrato\n│  ├─ Escamoso → formado por escamas\n│  ├─ Folioso → láminas o lóbulos\n│  ├─ Fruticuloso → ramificado/tridimensional\n│  ├─ Dimórfico → combinación de formas\n│  └─ Gelatinoso → consistencia gelatinosa cuando está húmedo\n├─ Estructuras\n│  ├─ Rizinas → fijación\n│  ├─ Apotecios → reproducción sexual del hongo\n│  ├─ Isidios → propagación asexual\n│  └─ Soredios → propagación asexual\n├─ Corte transversal\n│  ├─ Fotobionte → células verdes\n│  ├─ Médula → hifas\n│  └─ Organización del talo\n└─ Técnicas\n   ├─ Observación directa\n   ├─ Estereoscopio\n   └─ Corte transversal + agua destilada + microscopio",
+                "briofitos": "Briófitos\n├─ Ciclo de vida\n│  ├─ Gametofito (N) → generación dominante\n│  │  └─ Produce gametos\n│  └─ Esporofito (2N) → generación breve\n│     └─ Produce esporas\n├─ Musgos\n│  ├─ Gametofito\n│  │  ├─ Rizoides\n│  │  ├─ Caulidio\n│  │  └─ Filidios\n│  └─ Esporofito\n│     ├─ Seta\n│     ├─ Cápsula\n│     ├─ Opérculo\n│     ├─ Peristoma\n│     └─ Caliptra en algunas especies\n├─ Hepáticas talosas\n│  ├─ Talo plano\n│  ├─ Ramificación dicotómica\n│  ├─ Rizoides unicelulares\n│  ├─ Escamas multicelulares\n│  ├─ Poros aeríferos\n│  ├─ Anteridiofóro + disco anteridial\n│  └─ Arquegoniofóro + disco arquegonial\n├─ Hepáticas foliosas\n│  ├─ Rizoides\n│  ├─ Caulidio\n│  └─ Filidios\n└─ Anthoceros\n   ├─ Gametofito aplanado, verde y arrosetado\n   ├─ Ramificación dicotómica\n   ├─ Esporofito alargado en forma de cuerno\n   └─ Involucro en la base del esporofito"
+            }
+        };
+
+        /* --------------------------
+  Utilidades y renderizado
+-------------------------- */
+        function ensureDbShape() {
+            DB.quizTopics = Array.isArray(DB.quizTopics) ? DB.quizTopics: [];
+            DB.questions = Array.isArray(DB.questions) ? DB.questions: [];
+            DB.glossary = Array.isArray(DB.glossary) ? DB.glossary: [];
+            DB.flashcards = Array.isArray(DB.flashcards) ? DB.flashcards: [];
+            DB.structures = Array.isArray(DB.structures) ? DB.structures: [];
+            DB.cases = Array.isArray(DB.cases) ? DB.cases: [];
+            DB.interactives = Array.isArray(DB.interactives) ? DB.interactives: [];
+            DB.maps = DB.maps && typeof DB.maps === 'object' ? DB.maps: {};
+        }
+
+        function escapeHtml(s) {
+            if (!s) return ''; return String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+        }
+
+        /* render glossary */
+        function renderGloss() {
+            const list = document.getElementById('glossList');
+            list.innerHTML = '';
+
+            const glossary = Array.isArray(DB.glossary) ? DB.glossary: [];
+            const query = normalizeText(document.getElementById('glossSearch').value || '');
+
+            glossary
+            .filter(item => {
+                const term = normalizeText(item.term);
+                const def = normalizeText(item.def);
+                return !query || term.includes(query) || def.includes(query);
+            })
+            .forEach((g, idx) => {
+                const itemId = g.id || `gloss-${idx}`;
+
+                const div = document.createElement('div');
+                div.className = 'relative p-2 border-b';
+
+                div.innerHTML = `
+                <strong>${escapeHtml(g.term)}</strong>
+                <p class="text-xs text-gray-700 pr-14">${escapeHtml(g.def)}</p>
+
+                <button data-i="${idx}" class="edit-gloss text-blue-600 text-xs mt-1">
+                Editar
+                </button>
+
+                <div class="absolute bottom-1 right-1 flex gap-1">
+                <button data-section="gloss" data-id="${itemId}" data-correct="true" class="score-btn text-xs">✅</button>
+                <button data-section="gloss" data-id="${itemId}" data-correct="false" class="score-btn text-xs">❌</button>
+                </div>
+                `;
+
+                list.appendChild(div);
+            });
+
+            list.querySelectorAll('.edit-gloss').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const i = parseInt(btn.dataset.i);
+                    document.getElementById('termInput').value = DB.glossary[i].term || '';
+                    document.getElementById('defInput').value = DB.glossary[i].def || '';
+                    DB.glossary.splice(i, 1);
+                    renderGloss();
+                    saveToLocal();
+                    updateDashboard();
+                });
+            });
+
+            list.querySelectorAll('.score-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    markItem(
+                        btn.dataset.section,
+                        btn.dataset.id,
+                        btn.dataset.correct === 'true'
+                    );
+                });
+            });
+
+            document.getElementById('glossJSON').value = JSON.stringify(glossary, null, 2);
+        }
+        document.getElementById('glossSearch').addEventListener('input', renderGloss);
+
+        /* render flashcards */
+        function renderFlashcards() {
+            const cont = document.getElementById('flashContainer');
+            cont.innerHTML = '';
+
+            const flashcards = Array.isArray(DB.flashcards) ? DB.flashcards: [];
+
+            flashcards.forEach((f, i) => {
+                const itemId = f.id || `flash-${i}`;
+
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.style.width = '240px';
+
+                card.innerHTML = `
+                <div class="card-inner" data-index="${i}">
+                <div class="card-front">
+                ${escapeHtml(f.front)}
+                </div>
+
+                <div class="card-back relative">
+                <span class="pr-14">${escapeHtml(f.back)}</span>
+
+                <div class="absolute bottom-1 right-1 flex gap-1">
+                <button data-section="flash" data-id="${itemId}" data-correct="true" class="score-btn text-xs">✅</button>
+                <button data-section="flash" data-id="${itemId}" data-correct="false" class="score-btn text-xs">❌</button>
+                </div>
+                </div>
+                </div>
+                `;
+
+                card.querySelector('.card-inner').addEventListener('click', e => {
+                    const inner = e.currentTarget;
+                    inner.style.transform = inner.style.transform ? '': 'rotateY(180deg)';
+                });
+
+                card.querySelectorAll('.score-btn').forEach(btn => {
+                    btn.addEventListener('click', e => {
+                        e.stopPropagation();
+
+                        markItem(
+                            btn.dataset.section,
+                            btn.dataset.id,
+                            btn.dataset.correct === 'true'
+                        );
+                    });
+                });
+
+                cont.appendChild(card);
+            });
+
+            document.getElementById('flashJSON').value = JSON.stringify(flashcards, null, 2);
+        }
+
+        /* render structures */
+        function renderStructures() {
+            const area = document.getElementById('structuresArea'); area.innerHTML = '';
+            const structures = Array.isArray(DB.structures) ? DB.structures: [];
+            structures.forEach((s, idx)=> {
+                const options = Array.isArray(s.options) ? s.options: [];
+                const wrap = document.createElement('div'); wrap.className = 'p-3 border rounded';
+                wrap.innerHTML = `<div><h4 class="font-semibold">${idx+1}. ${escapeHtml(s.title)}</h4><div class="text-sm mt-1">Imagen: <a class="link-img" target="_blank" href="${s.img}">${s.img}</a></div><div class="mt-2" id="opts-${idx}"></div></div>`;
+                area.appendChild(wrap);
+                const optsDiv = wrap.querySelector(`#opts-${idx}`);
+                options.forEach((o, i)=> {
+                    const radio = document.createElement('label'); radio.className = 'mr-3 block'; radio.innerHTML = `<input type="radio" name="struct_${idx}" value="${i}"> ${escapeHtml(o)}`; optsDiv.appendChild(radio);
+                });
+                const btn = document.createElement('button'); btn.className = 'mt-2 px-2 py-1 bg-amber-500 text-white rounded'; btn.textContent = 'Verificar';
+                btn.addEventListener('click', () => {
+                    const sel = wrap.querySelector(`input[name="struct_${idx}"]:checked`);
+
+                    if (!sel) {
+                        alert('Selecciona opción');
+                        return;
+                    }
+
+                    const itemId = s.id || `structure-${idx}`;
+
+                    if (parseInt(sel.value) === s.answer) {
+                        alert('✅ Correcto\n' + (s.explain || ''));
+                        markItem('structures', itemId, true);
+                    } else {
+                        alert('❌ Incorrecto\n' + (s.explain || ''));
+                        markItem('structures', itemId, false);
+                    }
+                });
+                wrap.appendChild(btn);
+            });
+            document.getElementById('structuresJSON').value = JSON.stringify(structures, null, 2);
+        }
+
+        /* render cases */
+        function renderCases() {
+            const area = document.getElementById('casesArea'); area.innerHTML = '';
+            const casesList = Array.isArray(DB.cases) ? DB.cases: [];
+            casesList.forEach((c,
+                idx)=> {
+                const options = Array.isArray(c.options) ? c.options: [];
+                const wrap = document.createElement('div'); wrap.className = 'p-3 border rounded mb-3';
+                wrap.innerHTML = `<div><h4 class="font-semibold">Caso ${idx+1}</h4><p class="mt-1">${escapeHtml(c.text)}</p><div class="mt-2" id="caseOpts${idx}"></div></div>`;
+                area.appendChild(wrap);
+                const optsDiv = wrap.querySelector(`#caseOpts${idx}`);
+                options.forEach((o, i)=> {
+                    const label = document.createElement('label'); label.className = 'block'; label.innerHTML = `<input type="radio" name="case_${idx}" value="${i}"> ${escapeHtml(o)}`; optsDiv.appendChild(label);
+                });
+                const btn = document.createElement('button'); btn.className = 'mt-2 px-2 py-1 bg-indigo-600 text-white rounded'; btn.textContent = 'Responder';
+                btn.addEventListener('click',
+                    () => {
+                        const sel = wrap.querySelector(`input[name="case_${idx}"]:checked`);
+
+                        if (!sel) {
+                            alert('Selecciona opción');
+                            return;
+                        }
+
+                        const itemId = c.id || `case-${idx}`;
+
+                        if (parseInt(sel.value) === c.answer) {
+                            alert('✅ Correcto\n' + (c.feedback || ''));
+                            markItem('cases', itemId, true);
+                        } else {
+                            alert('❌ Incorrecto\n' + (c.feedback || ''));
+                            markItem('cases', itemId, false);
+                        }
+                    });
+                wrap.appendChild(btn);
+            });
+            document.getElementById('casesJSON').value = JSON.stringify(casesList, null, 2);
+        }
+
+        /* render interactives with correct drag/drop handling */
+        function renderInteratives() {
+            const area = document.getElementById('interactiveArea'); area.innerHTML = '';
+            (Array.isArray(DB.interactives) ? DB.interactives: []).forEach((it,
+                idx)=> {
+                const block = document.createElement('div'); block.className = 'p-3 border rounded';
+                block.innerHTML = `<h4 class="font-semibold">${idx+1}. ${escapeHtml(it.title || it.id)}</h4>`;
+                if (it.type === 'dragdrop') {
+                    const terms = Array.isArray(it.terms) ? it.terms: [];
+                    const targets = Array.isArray(it.targets) ? it.targets: [];
+                    const termsDiv = document.createElement('div'); termsDiv.className = 'mt-2 flex gap-2 flex-wrap';
+                    terms.forEach((t, i)=> {
+                        const d = document.createElement('div'); d.className = 'draggable'; d.id = `term-${idx}-${i}`; d.draggable = true; d.textContent = t;
+                        d.addEventListener('dragstart', e => {
+                            e.dataTransfer.setData('text/plain', d.id); e.dataTransfer.effectAllowed = 'move';
+                        });
+                        termsDiv.appendChild(d);
+                    });
+                    const targetsDiv = document.createElement('div'); targetsDiv.className = 'mt-3 grid grid-cols-1 gap-2';
+                    targets.forEach((tg, i)=> {
+                        const dz = document.createElement('div'); dz.className = 'dropzone'; dz.id = `target-${idx}-${i}`;
+                        dz.dataset.target = tg;
+                        const label = document.createElement('span');
+                        label.className = 'dropzone-label';
+                        label.textContent = tg;
+                        dz.appendChild(label);
+                        dz.addEventListener('dragover', e => {
+                            e.preventDefault(); e.dataTransfer.dropEffect = 'move'; dz.style.backgroundColor = '#f8fafc';
+                        });
+                        dz.addEventListener('dragleave', e => {
+                            dz.style.backgroundColor = '';
+                        });
+                        dz.addEventListener('drop', e => {
+                            e.preventDefault();
+                            dz.style.backgroundColor = '';
+                            const id = e.dataTransfer.getData('text/plain');
+                            const el = document.getElementById(id);
+                            if (!el) return;
+                            // append (this move automatically removes from previous parent)
+                            dz.appendChild(el);
+                            // compute trimmed texts
+                            const childText = el.textContent.trim();
+                            const expected = normalizeText((it.answerMap && it.answerMap[childText]) ? it.answerMap[childText]: '');
+                            const zoneText = normalizeText(dz.dataset.target || label.textContent || '');
+                            if (expected && expected === zoneText) {
+                                dz.style.borderColor = '#16a34a';
+                                dz.style.backgroundColor = '#ecfdf5';
+                                dz.dataset.correct = 'true';
+                            } else {
+                                dz.style.borderColor = '#dc2626';
+                                dz.style.backgroundColor = '#fff1f2';
+                                dz.dataset.correct = 'false';
+                            }
+                            // For other zones: if empty reset; if they have children, re-evaluate them
+                            targets.forEach((ot, j)=> {
+                                const otherDz = document.getElementById(`target-${idx}-${j}`);
+                                if (!otherDz) return;
+                                if (otherDz === dz) return;
+                                // remove any duplicate of the moved element (safety)
+                                Array.from(otherDz.querySelectorAll('.draggable')).forEach(ch => {
+                                    if (ch.id === el.id) otherDz.removeChild(ch);
+                                });
+                                if (otherDz.querySelectorAll('.draggable').length === 0) {
+                                    otherDz.style.borderColor = '#94a3b8'; otherDz.style.backgroundColor = ''; delete otherDz.dataset.correct;
+                                } else {
+                                    const rem = otherDz.querySelector('.draggable');
+                                    if (rem) {
+                                        const remText = rem.textContent.trim();
+                                        const remExp = normalizeText((it.answerMap && it.answerMap[remText]) ? it.answerMap[remText]: '');
+                                        const otherLabel = otherDz.querySelector('.dropzone-label');
+                                        const otherZoneText = normalizeText(otherDz.dataset.target || (otherLabel ? otherLabel.textContent: ''));
+                                        if (remExp && remExp === otherZoneText) {
+                                            otherDz.style.borderColor = '#16a34a'; otherDz.style.backgroundColor = '#ecfdf5'; otherDz.dataset.correct = 'true';
+                                        } else {
+                                            otherDz.style.borderColor = '#dc2626'; otherDz.style.backgroundColor = '#fff1f2'; otherDz.dataset.correct = 'false';
+                                        }
+                                    }
+                                }
+                            });
+                        });
+                        targetsDiv.appendChild(dz);
+                    });
+                    block.appendChild(termsDiv);
+                    block.appendChild(targetsDiv);
+
+                    const checkBtn = document.createElement('button');
+                    checkBtn.className = 'mt-2 px-2 py-1 bg-amber-500 text-white rounded';
+                    checkBtn.textContent = 'Verificar actividad';
+
+                    checkBtn.addEventListener('click', () => {
+                        const itemId = it.id || `interactive-${idx}`;
+                        const zones = block.querySelectorAll('.dropzone');
+                        const allCorrect = Array.from(zones).length > 0 &&
+                        Array.from(zones).every(zone => zone.dataset.correct === 'true');
+
+                        if (allCorrect) {
+                            alert('✅ Actividad correcta');
+                            markItem('interactive', itemId, true);
+                        } else {
+                            alert('❌ Revisa la actividad.');
+                            markItem('interactive', itemId, false);
+                        }
+                    });
+
+                    block.appendChild(checkBtn);
+                } else if (it.type === 'complete') {
+                    const q = document.createElement('div'); q.innerHTML = `<div class="mt-2">${escapeHtml(it.prompt || '')}</div><input class="mt-2 border rounded p-1" id="fill-${idx}">`;
+                    const btn = document.createElement('button'); btn.className = 'mt-2 px-2 py-1 bg-amber-500 text-white rounded'; btn.textContent = 'Verificar';
+                    btn.addEventListener('click', () => {
+                        const user = document.getElementById(`fill-${idx}`).value.trim();
+                        const itemId = it.id || `interactive-${idx}`;
+
+                        if (normalizeText(user) === normalizeText(it.answer || '')) {
+                            alert('✅ Correcto');
+                            markItem('interactive', itemId, true);
+                        } else {
+                            alert('❌ Incorrecto.');
+                            markItem('interactive', itemId, false);
+                        }
+                    });
+                    block.appendChild(q); block.appendChild(btn);
+                }
+                area.appendChild(block);
+            });
+            document.getElementById('interJSON').value = JSON.stringify(DB.interactives, null, 2);
+        }
+
+        /* render maps */
+        function renderMaps() {
+            const disp = document.getElementById('mapsDisplay');
+            disp.innerHTML = '';
+
+            Object.entries(DB.maps || {}).forEach(([k,
+                v]) => {
+                const itemId = `map-${k}`;
+
+                const div = document.createElement('div');
+                div.className = 'relative bg-gray-50 p-3 rounded';
+
+                div.innerHTML = `
+                <h3 class="font-semibold capitalize">${escapeHtml(k)}</h3>
+                <pre class="map pr-14">${escapeHtml(v)}</pre>
+
+                <div class="absolute bottom-1 right-1 flex gap-1">
+                <button data-section="maps" data-id="${itemId}" data-correct="true" class="score-btn text-xs">✅</button>
+                <button data-section="maps" data-id="${itemId}" data-correct="false" class="score-btn text-xs">❌</button>
+                </div>
+                `;
+
+                div.querySelectorAll('.score-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        markItem(
+                            btn.dataset.section,
+                            btn.dataset.id,
+                            btn.dataset.correct === 'true'
+                        );
+                    });
+                });
+
+                disp.appendChild(div);
+            });
+
+            document.getElementById('mapsJSON').value = JSON.stringify(DB.maps || {}, null, 2);
+        }
+
+        /* Save/load DB to localStorage */
+        function saveToLocal() {
+            localStorage.setItem('DB_biocel', JSON.stringify(DB));
+        }
+        function loadFromLocal() {
+            const raw = localStorage.getItem('DB_biocel');
+            if (raw) {
+                try {
+                    DB = JSON.parse(raw);
+                } catch(e) {
+                    console.error(e);
+                }
+            }
+            ensureDbShape();
+            renderAll();
+        }
+        function renderAll() {
+            ensureDbShape();
+            renderQuizTopics();
+            renderGloss();
+            renderFlashcards();
+            renderStructures();
+            renderCases();
+            renderInteratives();
+            renderMaps();
+
+            document.getElementById('questionsJSON').value = JSON.stringify(DB.questions || [], null, 2);
+            document.getElementById('quizTopicsJSON').value = JSON.stringify(DB.quizTopics || [], null, 2);
+
+            updateDashboard();
+        }
+        /* Score and dashboard */
+        const POINTS_PER_ITEM = 10;
+
+        function getProgress() {
+            return JSON.parse(localStorage.getItem('progressBySection') || '{}');
+        }
+
+        function saveProgress(progress) {
+            localStorage.setItem('progressBySection', JSON.stringify(progress));
+        }
+
+        function markItem(section, id, isCorrect) {
+            const progress = getProgress();
+
+            if (!progress[section]) {
+                progress[section] = {};
+            }
+
+            progress[section][id] = isCorrect ? 'correct': 'incorrect';
+
+            saveProgress(progress);
+            updateDashboard();
+        }
+
+        function countCorrect(progress, section) {
+            if (!progress[section]) return 0;
+
+            return Object.values(progress[section]).filter(value => value === 'correct').length;
+        }
+
+        function getSectionTotals() {
+            return {
+                quiz: Array.isArray(DB.questions) ? DB.questions.length: 0,
+                gloss: Array.isArray(DB.glossary) ? DB.glossary.length: 0,
+                flash: Array.isArray(DB.flashcards) ? DB.flashcards.length: 0,
+                structures: Array.isArray(DB.structures) ? DB.structures.length: 0,
+                cases: Array.isArray(DB.cases) ? DB.cases.length: 0,
+                interactive: Array.isArray(DB.interactives) ? DB.interactives.length: 0,
+                maps: DB.maps && typeof DB.maps === 'object' ? Object.keys(DB.maps).length: 0
+            };
+        }
+
+        function formatProgress(correct, total) {
+            const obtained = correct * POINTS_PER_ITEM;
+            const max = total * POINTS_PER_ITEM;
+            const percent = max > 0 ? Math.round((obtained / max) * 100): 0;
+
+            return {
+                obtained,
+                max,
+                percent,
+                text: `${obtained} / ${max} - ${percent}%`
+            };
+        }
+
+        function updateDashboard() {
+            const progress = getProgress();
+            const totals = getSectionTotals();
+
+            const quiz = formatProgress(countCorrect(progress, 'quiz'), totals.quiz);
+            const gloss = formatProgress(countCorrect(progress, 'gloss'), totals.gloss);
+            const flash = formatProgress(countCorrect(progress, 'flash'), totals.flash);
+            const structures = formatProgress(countCorrect(progress, 'structures'), totals.structures);
+            const cases = formatProgress(countCorrect(progress, 'cases'), totals.cases);
+            const interactive = formatProgress(countCorrect(progress, 'interactive'), totals.interactive);
+            const maps = formatProgress(countCorrect(progress, 'maps'), totals.maps);
+
+            const obtainedTotal =
+            quiz.obtained +
+            gloss.obtained +
+            flash.obtained +
+            structures.obtained +
+            cases.obtained +
+            interactive.obtained +
+            maps.obtained;
+
+            const maxTotal =
+            quiz.max +
+            gloss.max +
+            flash.max +
+            structures.max +
+            cases.max +
+            interactive.max +
+            maps.max;
+
+            const totalPercent = maxTotal > 0
+            ? Math.round((obtainedTotal / maxTotal) * 100): 0;
+
+            document.getElementById('score').textContent = obtainedTotal;
+            document.getElementById('maxScore').textContent = maxTotal;
+            document.getElementById('scorePercent').textContent = `${totalPercent}%`;
+
+            document.getElementById('progressQuiz').textContent = quiz.text;
+            document.getElementById('progressGloss').textContent = gloss.text;
+            document.getElementById('progressFlash').textContent = flash.text;
+            document.getElementById('progressStructures').textContent = structures.text;
+            document.getElementById('progressCases').textContent = cases.text;
+            document.getElementById('progressInteractive').textContent = interactive.text;
+            document.getElementById('progressMaps').textContent = maps.text;
+        }
+
+        loadFromLocal();
+
+        /* Navigation wiring */
+        const sections = document.querySelectorAll("section");
+        document.querySelectorAll(".btn").forEach(btn=> {
+            btn.classList.add("px-3", "py-1", "rounded", "bg-indigo-600", "text-white"); btn.addEventListener('click', ()=> {
+                sections.forEach(sec=>sec.classList.add('hidden-by-default')); document.getElementById(btn.dataset.target).classList.remove('hidden-by-default'); window.scrollTo({
+                    top: 0, behavior: 'smooth'
+                });
+            });
+        });
+
+        /* File import/export */
+        const fileInput = document.getElementById('fileInput');
+        document.querySelector('.btn-file').addEventListener('click', ()=> fileInput.click());
+        fileInput.addEventListener('change', handleFile, false);
+        document.getElementById('exportJSON').addEventListener('click', exportAll);
+
+        function handleFile(evt) {
+            const f = evt.target.files[0];
+            if (!f) return;
+            const reader = new FileReader();
+            reader.onload = e=> {
+                try {
+                    const obj = JSON.parse(e.target.result);
+                    // basic merge/replace: if keys present replace DB keys
+                    DB = Object.assign({}, DB, obj);
+                    ensureDbShape();
+                    renderAll();
+                    saveToLocal();
+                    alert('Contenido importado correctamente.');
+                } catch(err) {
+                    alert('Error leyendo JSON: ' + err.message);
+                }
+            };
+            reader.readAsText(f);
+        }
+        function exportAll() {
+            const dataStr = JSON.stringify(DB, null, 2);
+            const blob = new Blob([dataStr], {
+                type: "application/json"
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'contenido_biologia_celular.json'; document.body.appendChild(a); a.click(); a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        /* CRUD simple for glosario, flashcards, etc. */
+        document.getElementById('addTerm').addEventListener('click', ()=> {
+            const t = document.getElementById('termInput').value.trim(); const d = document.getElementById('defInput').value.trim();
+            if (!t || !d) {
+                alert('Rellena término y definición'); return;
+            }
+            DB.glossary.unshift({
+                term: t, def: d
+            }); document.getElementById('termInput').value = ''; document.getElementById('defInput').value = ''; renderGloss(); saveToLocal();
+        });
+        document.getElementById('clearGloss').addEventListener('click', ()=> {
+            if (!confirm('Borrar todo el glosario?')) return; DB.glossary = []; renderGloss(); saveToLocal();
+        });
+        document.getElementById('importGloss').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('glossJSON').value); if (Array.isArray(arr)) {
+                    DB.glossary = arr;
+                    renderGloss();
+                    saveToLocal();
+                    updateDashboard();
+                    alert('Glosario importado');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportGloss').addEventListener('click', ()=> {
+            document.getElementById('glossJSON').value = JSON.stringify(DB.glossary, null, 2);
+        });
+
+        document.getElementById('loadFlash').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('flashJSON').value); if (Array.isArray(arr)) {
+                    DB.flashcards = arr;
+                    renderFlashcards();
+                    saveToLocal();
+                    updateDashboard();
+                    alert('Flashcards cargadas');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportFlash').addEventListener('click', ()=> {
+            document.getElementById('flashJSON').value = JSON.stringify(DB.flashcards, null, 2);
+        });
+
+        document.getElementById('loadStructures').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('structuresJSON').value); if (Array.isArray(arr)) {
+                    DB.structures = arr;
+                    renderStructures();
+                    saveToLocal();
+                    updateDashboard();
+                    alert('Estructuras cargadas');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportStructures').addEventListener('click', ()=> {
+            document.getElementById('structuresJSON').value = JSON.stringify(DB.structures, null, 2);
+        });
+
+        document.getElementById('loadCases').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('casesJSON').value); if (Array.isArray(arr)) {
+                    DB.cases = arr;
+                    renderCases();
+                    saveToLocal();
+                    updateDashboard();
+                    alert('Casos cargados');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportCases').addEventListener('click', ()=> {
+            document.getElementById('casesJSON').value = JSON.stringify(DB.cases, null, 2);
+        });
+
+        document.getElementById('loadInter').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('interJSON').value); if (Array.isArray(arr)) {
+                    DB.interactives = arr;
+                    renderInteratives();
+                    saveToLocal();
+                    updateDashboard();
+                    alert('Interactivos cargados');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportInter').addEventListener('click', ()=> {
+            document.getElementById('interJSON').value = JSON.stringify(DB.interactives, null, 2);
+        });
+
+        document.getElementById('loadMaps').addEventListener('click', ()=> {
+            try {
+                const obj = JSON.parse(document.getElementById('mapsJSON').value); if (typeof obj === 'object') {
+                    DB.maps = obj;
+                    renderMaps();
+                    saveToLocal();
+                    updateDashboard();
+                    alert('Mapas cargados');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportMaps').addEventListener('click', ()=> {
+            document.getElementById('mapsJSON').value = JSON.stringify(DB.maps || {}, null, 2);
+        });
+
+        /* Quiz: sequential behavior */
+        let filteredQuestions = DB.questions.slice();
+        let qIndex = 0;
+        let currentQuestion = null;
+        function renderQuizTopics() {
+            const select = document.getElementById('quizTopic');
+            if (!select) return;
+            select.innerHTML = '';
+            const allOption = document.createElement('option');
+            allOption.value = 'all';
+            allOption.textContent = 'Todos los bloques';
+            select.appendChild(allOption);
+            const topics = Array.isArray(DB.quizTopics) ? DB.quizTopics: [];
+            topics.forEach(topic => {
+                if (!topic || !topic.value) return;
+                const option = document.createElement('option');
+                option.value = topic.value;
+                option.textContent = topic.label || topic.value;
+                select.appendChild(option);
+            });
+        }
+        function refreshFiltered(topic) {
+            filteredQuestions = (topic && topic !== 'all') ? DB.questions.filter(q=> q.topic === topic): DB.questions.slice();
+            qIndex = 0;
+            document.getElementById('qTotal').textContent = filteredQuestions.length;
+            renderCurrentQuestion();
+        }
+        function renderCurrentQuestion() {
+            if (filteredQuestions.length === 0) {
+                document.getElementById('qText').textContent = 'No hay preguntas en este tema.'; document.getElementById('qOptions').innerHTML = ''; document.getElementById('qNumber').textContent = '0'; return;
+            }
+            if (qIndex < 0) qIndex = 0;
+            if (qIndex >= filteredQuestions.length) qIndex = filteredQuestions.length -1;
+            const q = filteredQuestions[qIndex];
+            document.getElementById('qText').textContent = q.text;
+            const opts = document.getElementById('qOptions'); opts.innerHTML = '';
+            const questionOptions = Array.isArray(q.options) ? q.options: [];
+            questionOptions.forEach((o, i)=> {
+                const label = document.createElement('label'); label.className = 'block'; label.innerHTML = `<input type="radio" name="qopt" value="${i}"> ${escapeHtml(o)}`; opts.appendChild(label);
+            });
+            document.getElementById('qNumber').textContent = (qIndex+1);
+            document.getElementById('qTotal').textContent = filteredQuestions.length;
+            currentQuestion = q;
+        }
+        document.getElementById('quizTopic').addEventListener('change', ()=> {
+            refreshFiltered(document.getElementById('quizTopic').value);
+        });
+        document.getElementById('nextQ').addEventListener('click', ()=> {
+            if (filteredQuestions.length === 0) {
+                alert('No hay preguntas.'); return;
+            } if (qIndex < filteredQuestions.length-1) qIndex++; renderCurrentQuestion();
+        });
+        document.getElementById('prevQ').addEventListener('click', ()=> {
+            if (filteredQuestions.length === 0) {
+                alert('No hay preguntas.'); return;
+            } if (qIndex > 0) qIndex--; renderCurrentQuestion();
+        });
+        document.getElementById('checkA').addEventListener('click', () => {
+            const sel = document.querySelector('input[name="qopt"]:checked');
+            const res = document.getElementById('qResult');
+
+            if (!currentQuestion) {
+                res.textContent = 'No hay pregunta seleccionada.';
+                return;
+            }
+
+            if (!sel) {
+                res.textContent = 'Selecciona una opción.';
+                return;
+            }
+
+            const itemId = currentQuestion.id || `quiz-${qIndex}`;
+
+            if (parseInt(sel.value) === currentQuestion.answer) {
+                res.textContent = '✅ Correcto. ' + (currentQuestion.explain || '');
+                markItem('quiz', itemId, true);
+            } else {
+                res.textContent = '❌ Incorrecto. ' + (currentQuestion.explain || '');
+                markItem('quiz', itemId, false);
+            }
+        });
+
+        document.getElementById('showAll').addEventListener('click', ()=> {
+            document.getElementById('questionsJSON').value = JSON.stringify(DB.questions, null, 2);
+        });
+
+        /* Load questions JSON editor */
+        document.getElementById('loadQuestions').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('questionsJSON').value); if (Array.isArray(arr)) {
+                    DB.questions = arr;
+                    refreshFiltered(document.getElementById('quizTopic').value);
+                    renderAll();
+                    saveToLocal();
+                    updateDashboard();
+                    alert('Preguntas cargadas');
+                } else alert('Formato inválido (se espera array).');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('loadQuizTopics').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('quizTopicsJSON').value);
+                if (Array.isArray(arr)) {
+                    DB.quizTopics = arr;
+                    renderQuizTopics();
+                    refreshFiltered(document.getElementById('quizTopic').value);
+                    saveToLocal();
+                    alert('Bloques del quiz cargados');
+                } else {
+                    alert('Formato inválido (se espera array).');
+                }
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportQuizTopics').addEventListener('click', ()=> {
+            document.getElementById('quizTopicsJSON').value = JSON.stringify(DB.quizTopics || [], null, 2);
+        });
+
+        /* Reset progress */
+        document.getElementById('reset').addEventListener('click', () => {
+            if (!confirm('Reiniciar todo el progreso?')) return;
+
+            localStorage.removeItem('progressBySection');
+            localStorage.removeItem('score');
+            localStorage.removeItem('block1');
+            localStorage.removeItem('block2');
+            localStorage.removeItem('block3');
+
+            updateDashboard();
+        });
+
+        /* initial render and quiz setup */
+        renderAll();
+        refreshFiltered('all');
+
+        /* =====================
+   HOME JSON (SOLO INICIO)
+   ===================== */
+
+        document.getElementById("loadHomeJSON").addEventListener("click", () => {
+            try {
+                const data = JSON.parse(document.getElementById("homeJSON").value);
+
+                if (data.title) {
+                    document.getElementById("homeTitle").textContent = data.title;
+                }
+                if (data.description) {
+                    document.getElementById("homeDescription").innerHTML = data.description;
+                }
+            } catch (e) {
+                alert("JSON inválido en Inicio");
+            }
+        });
+
+        document.getElementById("exportHomeJSON").addEventListener("click", () => {
+            const data = {
+                title: document.getElementById("homeTitle").textContent,
+                description: document.getElementById("homeDescription").innerHTML
+            };
+            document.getElementById("homeJSON").value = JSON.stringify(data, null, 2);
+        });
+    </script>
+</body>
+</html>
